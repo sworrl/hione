@@ -1,0 +1,204 @@
+// Package server is the local web UI and its JSON API. Everything the page does goes through the
+// API, so a script can drive and watch a run the same way.
+package server
+
+import (
+	"embed"
+	"encoding/json"
+	"fmt"
+	"io/fs"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/sworrl/mikumeasure/internal/adb"
+	"github.com/sworrl/mikumeasure/internal/capture"
+	"github.com/sworrl/mikumeasure/internal/engine"
+)
+
+//go:embed static
+var static embed.FS
+
+// Server wraps an engine.
+type Server struct {
+	E *engine.Engine
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", " ")
+	enc.Encode(v)
+}
+
+func errJSON(w http.ResponseWriter, code int, err error) {
+	writeJSON(w, code, map[string]string{"error": err.Error()})
+}
+
+// Handler returns the HTTP routes.
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	sub, _ := fs.Sub(static, "static")
+	mux.Handle("GET /", http.FileServer(http.FS(sub)))
+
+	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
+		st := map[string]any{
+			"capture":       s.E.Cfg.Capture,
+			"cap_rate":      s.E.Cfg.CapRate,
+			"cap_format":    s.E.Cfg.CapFormat,
+			"device":        s.E.Cfg.Device,
+			"level_dbfs":    s.E.Cfg.Level,
+			"busy":          s.E.Busy(),
+			"capture_error": s.E.CaptureError(),
+			"runs":          s.E.Runs(),
+			"logs":          s.E.Logs(),
+			"filters":       adb.Filters,
+		}
+		if ds := s.E.DevStatus(); ds != nil {
+			st["device_status"] = ds
+		}
+		writeJSON(w, 200, st)
+	})
+	mux.HandleFunc("GET /api/live", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, s.E.Live().Snapshot())
+	})
+	mux.HandleFunc("GET /api/spectrogram", func(w http.ResponseWriter, r *http.Request) {
+		n, _ := strconv.Atoi(r.URL.Query().Get("rows"))
+		if n <= 0 {
+			n = 200
+		}
+		writeJSON(w, 200, map[string]any{"freqs": s.E.Live().Snapshot().Freqs, "rows": s.E.Live().Spectrogram(n)})
+	})
+	mux.HandleFunc("GET /api/devices", func(w http.ResponseWriter, r *http.Request) {
+		var hosts []string
+		if strings.HasPrefix(s.E.Cfg.Capture, "ssh://") {
+			if p, err := capture.Parse(s.E.Cfg.Capture); err == nil {
+				hosts = append(hosts, p.Host)
+			}
+		}
+		ds, notes := capture.List(hosts)
+		writeJSON(w, 200, map[string]any{"devices": ds, "notes": notes})
+	})
+	mux.HandleFunc("GET /api/runs", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, s.E.Runs())
+	})
+	mux.HandleFunc("POST /api/runs", func(w http.ResponseWriter, r *http.Request) {
+		var spec engine.RunSpec
+		if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
+			errJSON(w, 400, fmt.Errorf("bad JSON: %w", err))
+			return
+		}
+		if spec.Kind == "" {
+			spec.Kind = "measure"
+		}
+		run, err := s.E.StartRun(spec)
+		if err != nil {
+			errJSON(w, 409, err)
+			return
+		}
+		writeJSON(w, 202, map[string]string{"id": run.ID, "status": "running"})
+	})
+	mux.HandleFunc("POST /api/level-check", func(w http.ResponseWriter, r *http.Request) {
+		spec := engine.RunSpec{Kind: "level"}
+		if r.ContentLength > 0 {
+			json.NewDecoder(r.Body).Decode(&spec)
+			spec.Kind = "level"
+		}
+		run, err := s.E.StartRun(spec)
+		if err != nil {
+			errJSON(w, 409, err)
+			return
+		}
+		writeJSON(w, 202, map[string]string{"id": run.ID, "status": "running"})
+	})
+	mux.HandleFunc("POST /api/stop", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]bool{"stopped": s.E.StopRun()})
+	})
+	mux.HandleFunc("GET /api/runs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		run := s.E.GetRun(r.PathValue("id"))
+		if run == nil {
+			run = loadRun(s.E.Cfg.OutDir, r.PathValue("id"))
+		}
+		if run == nil {
+			errJSON(w, 404, fmt.Errorf("no run %s", r.PathValue("id")))
+			return
+		}
+		b, err := engine.MarshalRun(run)
+		if err != nil {
+			errJSON(w, 500, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+	})
+	runFile := func(w http.ResponseWriter, r *http.Request, name string) {
+		id := r.PathValue("id")
+		if strings.ContainsAny(id, "/\\") || strings.Contains(name, "..") {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, filepath.Join(s.E.Cfg.OutDir, "runs", id, filepath.FromSlash(name)))
+	}
+	mux.HandleFunc("GET /api/report/{id}", func(w http.ResponseWriter, r *http.Request) { runFile(w, r, "report.html") })
+	mux.HandleFunc("GET /api/runs/{id}/files/{path...}", func(w http.ResponseWriter, r *http.Request) {
+		runFile(w, r, r.PathValue("path"))
+	})
+	mux.HandleFunc("GET /api/events", s.events)
+	return mux
+}
+
+func loadRun(out, id string) *engine.Run {
+	if strings.ContainsAny(id, "/\\.") {
+		return nil
+	}
+	b, err := os.ReadFile(filepath.Join(out, "runs", id, "run.json"))
+	if err != nil {
+		return nil
+	}
+	var r engine.Run
+	if json.Unmarshal(b, &r) != nil {
+		return nil
+	}
+	return &r
+}
+
+// events streams engine events and a live snapshot about 8 times a second (Server-Sent Events).
+func (s *Server) events(w http.ResponseWriter, r *http.Request) {
+	fl, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", 500)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	ch, cancel := s.E.Subscribe()
+	defer cancel()
+	tick := time.NewTicker(125 * time.Millisecond)
+	defer tick.Stop()
+	send := func(kind string, v any) bool {
+		b, _ := json.Marshal(v)
+		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", kind, b); err != nil {
+			return false
+		}
+		fl.Flush()
+		return true
+	}
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case ev := <-ch:
+			if !send(ev.Type, ev) {
+				return
+			}
+		case <-tick.C:
+			if !send("live", s.E.Live().Snapshot()) {
+				return
+			}
+		}
+	}
+}

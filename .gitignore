@@ -1,0 +1,7 @@
+/mikumeasure-out/
+/hione-out/
+/bin/
+*.wav
+*.flac
+/web/node_modules/
+/web/dist/

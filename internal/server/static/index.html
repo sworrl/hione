@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mikumeasure</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f3f0; --surface: #fcfcfb; --surface-2: #ffffff; --line: #d9d8d4; --line-2: #eeede9;
+  --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #8a8984;
+  --accent: #2a78d6; --good: #008300; --warn: #c98500; --bad: #e34948;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #20201f; --line: #3a3a37; --line-2: #2a2a28;
+    --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+    --accent: #3987e5; --good: #2fa52f; --warn: #c98500; --bad: #e66767;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --surface-2: #20201f; --line: #3a3a37; --line-2: #2a2a28;
+  --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+  --accent: #3987e5; --good: #2fa52f; --warn: #c98500; --bad: #e66767;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; padding: 14px 16px 8px; }
+h1 { font-size: 18px; margin: 0 8px 0 0; }
+h2 { font-size: 14px; margin: 0 0 8px; color: var(--ink-2); font-weight: 600; }
+.chip { font-size: 12px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 2px 9px; white-space: nowrap; }
+.chip b { color: var(--ink); font-weight: 600; }
+main { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; padding: 4px 16px 24px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.w3 { grid-column: span 3; } .w4 { grid-column: span 4; } .w5 { grid-column: span 5; } .w6 { grid-column: span 6; } .w7 { grid-column: span 7; } .w8 { grid-column: span 8; } .w12 { grid-column: span 12; }
+@media (max-width: 1100px) { .w3,.w4,.w5,.w6,.w7,.w8 { grid-column: span 12; } }
+canvas { width: 100%; display: block; }
+.meters { display: grid; grid-template-columns: 22px 1fr 64px; gap: 6px 8px; align-items: center; font-variant-numeric: tabular-nums; }
+.meter { position: relative; height: 18px; background: var(--line-2); border-radius: 4px; overflow: hidden; }
+.meter .rms { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); opacity: .55; }
+.meter .pk { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--ink); }
+.meter .zone { position: absolute; top: 0; bottom: 0; right: 0; background: color-mix(in srgb, var(--bad) 18%, transparent); }
+.clip { font-size: 11px; font-weight: 700; color: var(--surface); background: var(--line); border-radius: 3px; padding: 1px 4px; text-align: center; }
+.clip.on { background: var(--bad); }
+.scale { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); margin: 2px 0 0 30px; padding-right: 72px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.opts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+.opts label { white-space: nowrap; }
+.progress { height: 8px; background: var(--line-2); border-radius: 4px; overflow: hidden; margin: 6px 0; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.muted { color: var(--ink-3); font-size: 12px; }
+#log { font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; max-height: 260px; overflow: auto; white-space: pre-wrap; color: var(--ink-2); }
+.toggles { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin-top: 6px; }
+.toggles label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+.sw { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--line-2); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--ink-2); font-weight: 600; }
+.bar { height: 10px; background: var(--accent); border-radius: 2px; display: inline-block; vertical-align: middle; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 3px 10px; font-size: 12px; }
+.seg button.on { background: var(--accent); color: #fff; }
+a { color: var(--accent); }
+.status-pass { color: var(--good); font-weight: 600; } .status-fail { color: var(--bad); font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>mikumeasure</h1>
+  <span class="chip">capture <b id="cap">-</b></span>
+  <span class="chip">device <b id="dev">-</b></span>
+  <span class="chip">DAC <b id="dac">-</b></span>
+  <span class="chip">jack <b id="jack">-</b></span>
+  <span class="chip">volume <b id="vol">-</b></span>
+  <span class="chip">test level <b id="lvl">-</b></span>
+  <span class="chip" id="busy">idle</span>
+</header>
+<main>
+  <section class="card w5">
+    <h2>Input level</h2>
+    <div class="meters">
+      <span>L</span><div class="meter"><div class="zone" style="width:4%"></div><div class="rms" id="rmsL"></div><div class="pk" id="pkL"></div></div><span id="valL">-</span>
+      <span>R</span><div class="meter"><div class="zone" style="width:4%"></div><div class="rms" id="rmsR"></div><div class="pk" id="pkR"></div></div><span id="valR">-</span>
+    </div>
+    <div class="scale"><span>-120</span><span>-90</span><span>-60</span><span>-30</span><span>-6</span><span>0</span></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><span class="clip" id="clipL">CLIP L</span><span class="clip" id="clipR">CLIP R</span><span class="muted" id="levelMsg"></span></div>
+  </section>
+  <section class="card w7">
+    <h2>Run</h2>
+    <div class="controls">
+      <button id="btnLevel">Level check</button>
+      <button id="btnMatrix" class="primary">Run DAC matrix</button>
+      <button id="btnOne">Measure current setting</button>
+      <button id="btnStop">Stop</button>
+    </div>
+    <div class="opts">
+      <span>Rates:</span>
+      <label><input type="checkbox" class="rate" value="44100" checked> 44.1 kHz</label>
+      <label><input type="checkbox" class="rate" value="48000"> 48 kHz</label>
+      <label><input type="checkbox" class="rate" value="96000" checked> 96 kHz</label>
+      <label><input type="checkbox" class="rate" value="192000"> 192 kHz</label>
+      <span>Gain:</span>
+      <label><input type="checkbox" class="gain" value="low" checked> low</label>
+      <label><input type="checkbox" class="gain" value="middle"> middle</label>
+      <label><input type="checkbox" class="gain" value="high" checked> high</label>
+      <label><input type="checkbox" id="powerDre" checked> high power and DRE runs</label>
+      <label><input type="checkbox" id="fullPlan"> full plan (stepped sines, IMD)</label>
+    </div>
+    <div class="progress"><div id="prog"></div></div>
+    <div class="muted" id="progLabel">Nothing running.</div>
+    <div class="muted" id="reportLink"></div>
+  </section>
+  <section class="card w6">
+    <h2>Live spectrum</h2>
+    <canvas id="spec" height="260"></canvas>
+  </section>
+  <section class="card w6">
+    <h2>Spectrogram</h2>
+    <canvas id="spgram" height="260"></canvas>
+  </section>
+  <section class="card w8">
+    <h2 style="display:flex;justify-content:space-between;align-items:center">Frequency response
+      <span class="seg" id="frZoom"><button data-z="full" class="on">20 Hz to 20 kHz</button><button data-z="top">Top octave</button><button data-z="wide">To the sweep end</button></span></h2>
+    <canvas id="fr" height="340"></canvas>
+    <div class="toggles" id="frToggles"></div>
+  </section>
+  <section class="card w4">
+    <h2>Impulse response</h2>
+    <canvas id="ir" height="340"></canvas>
+  </section>
+  <section class="card w7">
+    <h2>Results per mode</h2>
+    <div style="overflow-x:auto"><table id="resTable"><thead><tr><th>Mode</th><th>Level dBFS</th><th>THD+N dB</th><th></th><th>Noise dBFS(A)</th><th>SNR dB(A)</th><th>DR dB(A)</th><th>Xtalk dB</th><th>Bal dB</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section class="card w5">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const series = () => [1,2,3,4,5,6,7,8].map(i => css('--s' + i));
+let state = {}, currentRun = null, runData = null, hidden = {}, frZoom = 'full';
+const spectroRows = [];
+
+function fmt(v, d=1) { return (v === null || v === undefined || isNaN(v) || v < -900) ? '-' : Number(v).toFixed(d); }
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function log(msg, time) {
+  const el = $('log');
+  const t = time ? new Date(time) : new Date();
+  el.textContent += t.toTimeString().slice(0, 8) + '  ' + msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function refreshState() {
+  try {
+    state = await api('/api/state');
+    $('cap').textContent = `${state.capture} · ${state.cap_rate / 1000} kHz ${state.cap_format}`;
+    $('dev').textContent = state.device;
+    const ds = state.device_status;
+    if (ds) {
+      const age = ds.updated ? Math.round((Date.now() - new Date(ds.updated)) / 1000) : null;
+      $('dev').textContent = ds.ok ? `${state.device} · ${ds.target}` : 'adb lost';
+      $('dev').style.color = ds.ok ? '' : 'var(--bad)';
+      $('dac').textContent = ds.dac_label || '-';
+      $('jack').textContent = ds.wired_output === 'none' ? 'nothing plugged' : (ds.wired_output || '-');
+      $('vol').textContent = ds.volume || '-';
+      const src = ds.sources || {};
+      $('dac').title = (src.dac || '') + (age !== null ? `, read ${age} s ago` : '');
+      $('jack').title = src.wired || ''; $('vol').title = src.volume || '';
+      if (!ds.ok) $('dac').title = ds.error;
+    } else { $('dac').textContent = '-'; $('jack').textContent = '-'; $('vol').textContent = '-'; }
+    $('lvl').textContent = state.level_dbfs + ' dBFS';
+    $('busy').textContent = state.busy ? 'running' : 'idle';
+    if (state.capture_error) log('Capture: ' + state.capture_error);
+    for (const b of ['btnLevel', 'btnMatrix', 'btnOne']) $(b).disabled = state.busy;
+    if (!currentRun && state.runs && state.runs.length) loadRun(state.runs[0].id);
+  } catch (e) { log('State: ' + e.message); }
+}
+
+// ---- meters ----
+const dbToPct = db => Math.max(0, Math.min(100, (db + 120) / 120 * 100));
+function meters(s) {
+  for (const [i, c] of [[0, 'L'], [1, 'R']]) {
+    $('rms' + c).style.width = dbToPct(s.rms_dbfs[i]) + '%';
+    $('pk' + c).style.left = 'calc(' + dbToPct(s.peak_dbfs[i]) + '% - 3px)';
+    $('val' + c).textContent = fmt(s.peak_dbfs[i]) + ' pk';
+    $('clip' + c).classList.toggle('on', s.clip[i]);
+  }
+}
+
+// ---- chart helpers ----
+function setup(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.height / (cv._dpr || 1);
+  if (!cv._h) cv._h = cv.height;
+  cv.width = w * dpr; cv.height = cv._h * dpr; cv._dpr = dpr;
+  cv.style.height = cv._h + 'px';
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return [g, w, cv._h];
+}
+
+function freqLabel(f) { return f >= 1000 ? (f / 1000) + 'k' : String(f); }
+
+function chart(cv, o) {
+  const [g, W, H] = setup(cv);
+  const L = 46, R = 10, T = 10, B = 26, pw = W - L - R, ph = H - T - B;
+  g.fillStyle = css('--surface'); g.fillRect(0, 0, W, H);
+  const xm = x => o.logx ? L + pw * Math.log(x / o.xmin) / Math.log(o.xmax / o.xmin) : L + pw * (x - o.xmin) / (o.xmax - o.xmin);
+  const ym = y => T + ph * (o.ymax - Math.max(o.ymin, Math.min(o.ymax, y))) / (o.ymax - o.ymin);
+  g.font = '11px system-ui'; g.fillStyle = css('--ink-3'); g.strokeStyle = css('--line-2'); g.lineWidth = 1;
+  const ys = o.ystep || niceStep((o.ymax - o.ymin) / 6);
+  g.textAlign = 'right';
+  for (let y = Math.ceil(o.ymin / ys) * ys; y <= o.ymax + 1e-9; y += ys) {
+    g.beginPath(); g.moveTo(L, ym(y)); g.lineTo(L + pw, ym(y)); g.stroke();
+    g.fillText(+y.toFixed(2), L - 5, ym(y) + 4);
+  }
+  g.textAlign = 'center';
+  if (o.logx) {
+    for (let d = Math.pow(10, Math.floor(Math.log10(o.xmin))); d <= o.xmax; d *= 10)
+      for (let m = 1; m <= 9; m++) {
+        const f = d * m; if (f < o.xmin * 0.999 || f > o.xmax * 1.001) continue;
+        const major = m === 1 || m === 2 || m === 5;
+        g.strokeStyle = major ? css('--line') : css('--line-2');
+        g.beginPath(); g.moveTo(xm(f), T); g.lineTo(xm(f), T + ph); g.stroke();
+        if (major) g.fillText(freqLabel(f), xm(f), H - 8);
+      }
+  } else {
+    const xs = niceStep((o.xmax - o.xmin) / 8);
+    for (let x = Math.ceil(o.xmin / xs) * xs; x <= o.xmax + 1e-9; x += xs) {
+      g.strokeStyle = css('--line-2'); g.beginPath(); g.moveTo(xm(x), T); g.lineTo(xm(x), T + ph); g.stroke();
+      g.fillText(+x.toFixed(3), xm(x), H - 8);
+    }
+  }
+  if (o.unit) { g.textAlign = 'left'; g.fillText(o.unit, 4, T + 8); }
+  g.save(); g.beginPath(); g.rect(L, T, pw, ph); g.clip();
+  for (const s of o.series) {
+    g.strokeStyle = s.color; g.lineWidth = s.width || 1.6; g.setLineDash(s.dash ? [5, 4] : []);
+    g.beginPath(); let first = true;
+    for (let i = 0; i < s.x.length; i++) {
+      const x = s.x[i], y = s.y[i];
+      if (x < o.xmin || x > o.xmax || y === null || isNaN(y)) { continue; }
+      if (first) { g.moveTo(xm(x), ym(y)); first = false; } else g.lineTo(xm(x), ym(y));
+    }
+    g.stroke();
+  }
+  g.restore();
+  g.strokeStyle = css('--line'); g.setLineDash([]); g.strokeRect(L, T, pw, ph);
+  cv._map = { xm, ym, o, L, T, pw, ph };
+}
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; }
+
+// ---- live spectrum and spectrogram ----
+function drawSpectrum(s) {
+  if (!s.spec_db || !s.spec_db[0]) return;
+  const c = series();
+  chart($('spec'), { logx: true, xmin: 10, xmax: s.rate / 2, ymin: -160, ymax: 0, ystep: 20, unit: 'dBFS',
+    series: [{ x: s.freqs, y: s.spec_db[0], color: c[0] }, { x: s.freqs, y: s.spec_db[1], color: c[1] }] });
+  const row = s.spec_db[0].map((v, i) => Math.max(v, s.spec_db[1][i]));
+  spectroRows.push(row); if (spectroRows.length > 300) spectroRows.shift();
+  drawSpectrogram(s.freqs);
+}
+function heat(v) { // -160..0 dBFS -> dark to light, one hue
+  const t = Math.max(0, Math.min(1, (v + 150) / 140));
+  const l = 8 + t * 82;
+  return `hsl(212 70% ${l}%)`;
+}
+function drawSpectrogram(freqs) {
+  const cv = $('spgram'); const [g, W, H] = setup(cv);
+  g.fillStyle = '#05070a'; g.fillRect(0, 0, W, H);
+  const n = spectroRows.length; if (!n) return;
+  const cw = W / 300, nb = freqs.length, rh = H / nb;
+  for (let i = 0; i < n; i++) {
+    const row = spectroRows[i], x = W - (n - i) * cw;
+    for (let b = 0; b < nb; b++) { g.fillStyle = heat(row[b]); g.fillRect(x, H - (b + 1) * rh, cw + 0.5, rh + 0.5); }
+  }
+  g.fillStyle = 'rgba(255,255,255,.75)'; g.font = '11px system-ui';
+  for (const f of [100, 1000, 10000, 20000, 50000]) {
+    if (f > freqs[nb - 1]) continue;
+    const b = Math.log(f / freqs[0]) / Math.log(freqs[nb - 1] / freqs[0]) * nb;
+    g.fillText(freqLabel(f), 4, H - b * rh + 4);
+  }
+}
+
+// ---- results ----
+function stepName(st) { return st.label; }
+async function loadRun(id) {
+  try {
+    runData = await api('/api/runs/' + id);
+    currentRun = id;
+    drawResults();
+    const done = runData.status !== 'running';
+    $('reportLink').innerHTML = done ? `Run ${id}: ${runData.status}. <a href="/api/report/${id}" target="_blank">Open report</a> · <a href="/api/runs/${id}" target="_blank">JSON</a>` : `Run ${id} in progress.`;
+    if (runData.level) $('levelMsg').innerHTML = `<span class="${runData.level.pass ? 'status-pass' : 'status-fail'}">${runData.level.pass ? 'Level OK' : 'Level check failed'}</span> ${runData.level.message}`;
+  } catch (e) { log('Run: ' + e.message); }
+}
+function doneSteps() { return (runData && runData.steps || []).filter(s => s.result && s.result.found); }
+function drawResults() {
+  const steps = doneSteps(); const c = series();
+  const colorOf = i => c[i % 8];
+  // FR
+  const tog = $('frToggles'); tog.innerHTML = '';
+  let maxF = 20000;
+  const sers = [];
+  steps.forEach((st, i) => {
+    const key = st.label; const col = colorOf(i);
+    const lab = document.createElement('label');
+    lab.innerHTML = `<input type="checkbox" ${hidden[key] ? '' : 'checked'}><span class="sw" style="background:${col}"></span>${key}`;
+    lab.querySelector('input').onchange = e => { hidden[key] = !e.target.checked; drawResults(); };
+    tog.appendChild(lab);
+    if (hidden[key]) return;
+    const fr = st.result.channels[0].fr;
+    maxF = Math.max(maxF, fr.hz[fr.hz.length - 1]);
+    sers.push({ x: fr.hz, y: fr.db, color: col });
+  });
+  let xmin = 20, xmax = 20000, ymin = -3, ymax = 1;
+  if (frZoom === 'top') { xmin = 10000; xmax = Math.max(22000, maxF); ymin = -6; ymax = 1; }
+  if (frZoom === 'wide') { xmin = 10; xmax = maxF; ymin = -12; ymax = 2; }
+  chart($('fr'), { logx: true, xmin, xmax, ymin, ymax, unit: 'dB re 1 kHz', series: sers });
+  // IR
+  const irs = [];
+  steps.forEach((st, i) => {
+    if (hidden[st.label]) return;
+    const ch = st.result.channels[0]; const ir = ch.ir; if (!ir) return;
+    const rate = st.result.cap_rate; const t0 = ch.ir_start_ms;
+    irs.push({ x: ir.map((_, k) => t0 + k / rate * 1000), y: ir, color: colorOf(i) });
+  });
+  chart($('ir'), { logx: false, xmin: -1, xmax: 3, ymin: -0.4, ymax: 1.1, unit: 'normalized', series: irs });
+  // Table
+  const tb = $('resTable').querySelector('tbody'); tb.innerHTML = '';
+  const all = (runData && runData.steps) || [];
+  const thdns = steps.map(s => s.result.channels[0].tone ? s.result.channels[0].tone.thdn_db : NaN).filter(v => !isNaN(v));
+  const worst = Math.max(-40, ...thdns), best = Math.min(-120, ...thdns);
+  for (const st of all) {
+    const tr = document.createElement('tr');
+    if (!st.result || !st.result.found) {
+      tr.innerHTML = `<td>${st.label}</td><td colspan="8" style="text-align:left;color:var(--ink-3)">${st.status}${st.error ? ': ' + st.error : ''}</td>`;
+    } else {
+      const L = st.result.channels[0], Rr = st.result.channels[1] || {};
+      const t = L.tone || {};
+      const w = Math.max(2, (t.thdn_db - best) / (worst - best) * 90);
+      tr.innerHTML = `<td>${st.label}</td><td>${fmt(t.level_dbfs)}</td><td>${fmt(t.thdn_db)}</td><td style="text-align:left;width:100px"><span class="bar" style="width:${w}px"></span></td>` +
+        `<td>${fmt(L.noise && L.noise.dbfs_a)}</td><td>${fmt(L.snr_a_db)}</td><td>${fmt(L.dr_a_db)}</td><td>${fmt(L.xtalk_db)}</td><td>${fmt(st.result.balance_db, 2)}</td>`;
+    }
+    tb.appendChild(tr);
+  }
+}
+document.querySelectorAll('#frZoom button').forEach(b => b.onclick = () => {
+  frZoom = b.dataset.z; document.querySelectorAll('#frZoom button').forEach(x => x.classList.toggle('on', x === b)); drawResults();
+});
+
+// ---- controls ----
+function vals(cls) { return [...document.querySelectorAll('.' + cls)].filter(x => x.checked).map(x => x.value); }
+async function start(spec) {
+  try { const r = await api('/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(spec) }); currentRun = r.id; hidden = {}; log('Started run ' + r.id); refreshState(); }
+  catch (e) { log('Start: ' + e.message); }
+}
+$('btnMatrix').onclick = () => start({ kind: 'matrix', plan: $('fullPlan').checked ? 'full' : 'quick', rates: vals('rate').map(Number), gains: vals('gain'), power_dre: $('powerDre').checked });
+$('btnOne').onclick = () => start({ kind: 'measure', plan: $('fullPlan').checked ? 'full' : 'quick', rates: vals('rate').map(Number).slice(0, 1) });
+$('btnLevel').onclick = () => api('/api/level-check', { method: 'POST' }).then(r => { currentRun = r.id; log('Level check ' + r.id); refreshState(); }).catch(e => log('Level: ' + e.message));
+$('btnStop').onclick = () => api('/api/stop', { method: 'POST' }).then(() => log('Stop requested'));
+
+// ---- events ----
+const es = new EventSource('/api/events');
+let lastSpec = 0;
+es.addEventListener('live', e => { const s = JSON.parse(e.data); meters(s); const now = Date.now(); if (now - lastSpec > 140) { lastSpec = now; drawSpectrum(s); } });
+es.addEventListener('log', e => { const ev = JSON.parse(e.data); log(ev.msg, ev.time); });
+es.addEventListener('progress', e => {
+  const p = JSON.parse(e.data).progress;
+  $('prog').style.width = (p.fraction * 100).toFixed(1) + '%';
+  $('progLabel').textContent = `${p.label}: ${p.phase}${p.segment ? ' (' + p.segment + ')' : ''}`;
+});
+es.addEventListener('step', e => { const st = JSON.parse(e.data).step; if (st.status === 'done' || st.status === 'failed') loadRun(st.run_id); });
+es.addEventListener('run', e => { const r = JSON.parse(e.data).run; currentRun = r.id; refreshState(); loadRun(r.id); if (r.status !== 'running') { $('prog').style.width = '0'; $('progLabel').textContent = `Run ${r.id} ${r.status}.`; } });
+es.addEventListener('level', e => {});
+fetch('/api/state').then(r => r.json()).then(s => (s.logs || []).forEach(l => log(l.msg, l.time)));
+refreshState(); setInterval(refreshState, 5000);
+window.addEventListener('resize', drawResults);
+</script>
+</body>
+</html>
