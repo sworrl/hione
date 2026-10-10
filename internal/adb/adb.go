@@ -78,6 +78,14 @@ func Find(want string) (*Device, error) {
 // more while the device's radio wakes up.
 var MinTimeout = 45 * time.Second
 
+// Lazy returns a device for want without checking that it answers (it may come back later).
+func Lazy(want string) *Device {
+	if strings.HasPrefix(want, "t:") {
+		return &Device{args: []string{"-t", strings.TrimPrefix(want, "t:")}, Label: want}
+	}
+	return &Device{args: []string{"-s", want}, Label: want}
+}
+
 // Shell runs a command on the device, once more if the first try times out.
 func (d *Device) Shell(timeout time.Duration, cmd string) (string, error) {
 	if timeout < MinTimeout {

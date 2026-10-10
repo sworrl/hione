@@ -220,6 +220,7 @@ func cmdServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	c := addCommon(fs)
 	addr := fs.String("addr", "127.0.0.1:8484", "listen address")
+	allow := fs.String("allow-origin", "", "comma-separated origins of hosted frontends allowed to pair, e.g. https://example.com")
 	fs.Parse(args)
 	e, err := c.engine(true)
 	if err != nil {
@@ -235,8 +236,15 @@ func cmdServe(args []string) error {
 	if err != nil {
 		return err
 	}
+	auth, err := server.LoadAuth(c.out, splitList(*allow), *addr)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("Hione UI: http://%s/\n", ln.Addr())
-	srv := &server.Server{E: e}
+	if len(auth.AllowOrigins) > 0 {
+		fmt.Printf("Hosted pages allowed to pair: %s. Pairing token: %s\n", strings.Join(auth.AllowOrigins, ", "), auth.Token)
+	}
+	srv := &server.Server{E: e, Auth: auth}
 	return http.Serve(ln, srv.Handler())
 }
 

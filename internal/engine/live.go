@@ -77,7 +77,7 @@ func (l *Live) feed(blk [][]float64) {
 			l.hist[c] = l.hist[c][len(l.hist[c])-l.fftN:]
 		}
 	}
-	if time.Since(l.lastSpec) > 150*time.Millisecond && len(l.hist[0]) == l.fftN {
+	if time.Since(l.lastSpec) > 30*time.Millisecond && len(l.hist[0]) == l.fftN {
 		l.lastSpec = time.Now()
 		l.computeSpectrum()
 	}

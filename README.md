@@ -15,6 +15,14 @@ go build -o hione ./cmd/hione
 go test ./...
 ```
 
+The web UI is a Vite + React + TypeScript app in `web/` that draws its charts with WebGL2. Its
+build goes into `internal/server/ui/` and is committed, so `go build` alone gives a complete
+binary. After changing the UI:
+
+```
+cd web && npm install && npm run build
+```
+
 Go 1.22 or newer. Linux is the main target. The capture backends call `arecord`,
 `pw-record` or `ssh`, so the binary itself builds for macOS and Windows too, but capture there
 needs a backend that is not written yet.
@@ -111,6 +119,19 @@ Each run gets a directory `hione-out/runs/<id>/`:
 
 Charts come in a light review theme and the dark Hione theme. Exported charts carry the
 device, DAC settings, capture chain and date, and a small Hione mark you can turn off.
+
+## Web UI
+
+`hione serve` prints the address, http://127.0.0.1:8484/ by default. The page shows the input
+meters, live spectrum and spectrogram (from a binary WebSocket, about 30 frames a second, drawn
+with WebGL), the run controls and progress, the frequency response of every mode with toggles,
+the impulse response, a results table, exports and the log. The older single-file page is at
+`/classic/`.
+
+The same frontend can be hosted on a website. Visitors without hardware get a demo that plays a
+recorded session. With hardware, they run `hione serve --allow-origin https://their.site` and
+pair with the token it prints. See `docs/live-protocol.md` for the stream format and the pairing
+rules.
 
 ## API
 

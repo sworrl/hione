@@ -21,12 +21,13 @@ import (
 	"github.com/sworrl/hione/internal/report"
 )
 
-//go:embed static
+//go:embed static ui
 var static embed.FS
 
 // Server wraps an engine.
 type Server struct {
-	E *engine.Engine
+	E    *engine.Engine
+	Auth *Auth
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -44,8 +45,30 @@ func errJSON(w http.ResponseWriter, code int, err error) {
 // Handler returns the HTTP routes.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	sub, _ := fs.Sub(static, "static")
-	mux.Handle("GET /", http.FileServer(http.FS(sub)))
+	classic, _ := fs.Sub(static, "static")
+	ui, _ := fs.Sub(static, "ui")
+	mux.Handle("GET /classic/", http.StripPrefix("/classic/", http.FileServer(http.FS(classic))))
+	mux.Handle("GET /", http.FileServer(http.FS(ui)))
+	mux.HandleFunc("GET /api/ws", s.ws)
+	mux.HandleFunc("GET /api/demo/record", s.demoRecord)
+	mux.HandleFunc("GET /api/pairing", func(w http.ResponseWriter, r *http.Request) {
+		if !s.Auth.SameOrigin(r) {
+			errJSON(w, 403, fmt.Errorf("only the local page can read the pairing token"))
+			return
+		}
+		writeJSON(w, 200, map[string]any{"token": s.Auth.Token, "allow_origins": s.Auth.AllowOrigins, "loopback": s.Auth.Loopback})
+	})
+	mux.HandleFunc("POST /api/pairing/reset", func(w http.ResponseWriter, r *http.Request) {
+		if !s.Auth.SameOrigin(r) {
+			errJSON(w, 403, fmt.Errorf("only the local page can reset pairing"))
+			return
+		}
+		if err := s.Auth.Reset(); err != nil {
+			errJSON(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]string{"token": s.Auth.Token})
+	})
 
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
 		st := map[string]any{
@@ -224,7 +247,7 @@ func (s *Server) Handler() http.Handler {
 		}
 	})
 	mux.HandleFunc("GET /api/events", s.events)
-	return mux
+	return s.Auth.Wrap(mux)
 }
 
 func (s *Server) run(id string) *engine.Run {

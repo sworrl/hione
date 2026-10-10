@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -117,7 +118,13 @@ func New(cfg Config) (*Engine, error) {
 	case "m500", "adb":
 		d, err := adb.Find(cfg.ADBSerial)
 		if err != nil {
-			return nil, err
+			if cfg.ADBSerial == "" {
+				return nil, err
+			}
+			// Wi-Fi adb drops now and then. Start anyway, the status poller shows "adb lost"
+			// until it answers again, and runs fail cleanly meanwhile.
+			fmt.Fprintf(os.Stderr, "adb %s does not answer yet (%v). Starting anyway.\n", cfg.ADBSerial, err)
+			d = adb.Lazy(cfg.ADBSerial)
 		}
 		e.Dev = d
 		e.player = &adbPlayer{d: d}
@@ -127,10 +134,33 @@ func New(cfg Config) (*Engine, error) {
 	default:
 		e.player = &manualPlayer{e: e}
 	}
+	e.loadRuns()
 	if p.Kind == capture.KindSim && e.simDev == nil {
 		return nil, errors.New("sim capture needs --device sim")
 	}
 	return e, nil
+}
+
+// loadRuns lists the runs already on disk, oldest first, so they show after a restart.
+func (e *Engine) loadRuns() {
+	paths, _ := filepath.Glob(filepath.Join(e.Cfg.OutDir, "runs", "*", "run.json"))
+	sort.Strings(paths)
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var r Run
+		if json.Unmarshal(b, &r) != nil || r.ID == "" {
+			continue
+		}
+		r.Dir = filepath.Dir(p)
+		if r.Status == "running" {
+			r.Status = "stopped"
+		}
+		e.runs[r.ID] = &r
+		e.order = append(e.order, r.ID)
+	}
 }
 
 // Live returns the live view.
@@ -331,6 +361,7 @@ func (e *Engine) recordPlan(ctx context.Context, plan *stim.Plan, timeout time.D
 	offset := 0 // absolute index of buf[0][0]
 	lastCheck := 0
 	syncAbs := -1.0
+	syncConf := 0.0
 	need := 0
 	deadline := time.After(timeout)
 	for {
@@ -364,6 +395,7 @@ func (e *Engine) recordPlan(ctx context.Context, plan *stim.Plan, timeout time.D
 					// Accept only when the whole marker is inside the window.
 					if conf >= analysis.MinConfidence && best+float64(len(ref)) < float64(win)-0.05*rate {
 						syncAbs = float64(offset+a) + best
+						syncConf = conf
 						start := int(syncAbs - (plan.SyncLead+0.3)*rate)
 						if start > offset {
 							cut := start - offset
@@ -386,6 +418,22 @@ func (e *Engine) recordPlan(ctx context.Context, plan *stim.Plan, timeout time.D
 					progress("waiting", 0)
 				}
 			} else {
+				// For 3 s after a detection, look for a clearer marker later on: a weak first hit
+				// can be a false one, and playback can restart once near the start.
+				if total-int(syncAbs) < int(3*rate) && total-lastCheck >= int(0.25*rate) {
+					lastCheck = total
+					win := min(len(buf[0]), int(2.5*rate))
+					a := len(buf[0]) - win
+					for ch := 0; ch < 2; ch++ {
+						p, cf := dsp.FindMarker(buf[ch][a:], ref)
+						pos := float64(offset+a) + p
+						if cf > 1.5*syncConf && cf >= analysis.MinConfidence && pos > syncAbs+0.05*rate && p+float64(len(ref)) < float64(win)-0.05*rate {
+							e.Logf("Clearer start marker found %.2f s later (confidence %.0f), using it.", (pos-syncAbs)/rate, cf)
+							syncAbs, syncConf = pos, cf
+							need = int(syncAbs+(plan.Total-plan.SyncLead+3)*rate*1.001) - offset
+						}
+					}
+				}
 				if progress != nil {
 					progress("recording", math.Min(1, float64(len(buf[0]))/float64(need)))
 				}
