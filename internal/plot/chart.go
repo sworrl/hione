@@ -331,6 +331,11 @@ func (b *Bars) Draw(c Canvas) {
 		c.Text(16, 42, b.Subtitle, 11.5, "l", t.Ink2, false)
 	}
 	left, right, top := 230.0, 70.0, 58.0
+	// Room for the longest label at 11 px (about 6.2 px a character), so long mode names
+	// are not cut off at the left edge.
+	for _, l := range b.Labels {
+		left = math.Max(left, 24+6.2*float64(len([]rune(l))))
+	}
 	n := len(b.Values)
 	if n == 0 {
 		return

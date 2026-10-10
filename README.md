@@ -8,6 +8,9 @@ adb and measure them all in one run.
 
 One static Go binary, no cgo. The web UI and the reports are built in.
 
+Press kit, screenshots, charts and the first real measurement (the HiBy M500's 3.5 mm output):
+[docs/PRESS_KIT.md](docs/PRESS_KIT.md).
+
 ## Build
 
 ```
@@ -35,6 +38,10 @@ needs a backend that is not written yet.
   about 60 dB under the test level, which swamps noise and THD+N. Use adb over Wi-Fi instead.
 - The capture card can be on another machine: `--capture ssh://host/hw:0,0` runs `arecord`
   there over ssh and streams the samples back.
+- Put the capture you use in `HIONE_CAPTURE` (for example `export HIONE_CAPTURE=ssh://host/hw:0,0`)
+  so it is the default. Without it Hione uses `auto`: PipeWire if it is there, else the ALSA
+  default device. With `auto` or the ALSA default it leaves the mixer alone, so name the card
+  (`alsa:hw:1,0`) to get the mixer setup below.
 
 Hione sets the capture card's mixer for a clean line capture (input source Line, no boost,
 capture gain 0 dB, analog loopback off). It saves the card's mixer with `alsactl store`
@@ -43,7 +50,7 @@ first and puts it back on exit, also on Ctrl-C.
 ## Commands
 
 ```
-hione devices                         list capture and playback devices, local and on ssh hosts, and the adb device
+hione devices --ssh host1,host2       list capture and playback devices, local and on ssh hosts ($HIONE_SSH_HOSTS), and the adb device
 hione serve                           live web UI and JSON API on http://127.0.0.1:8484/
 hione level                           level check only
 hione measure                         one measurement of the device as it is set now
@@ -58,7 +65,7 @@ Common flags:
 
 | Flag | Default | |
 |---|---|---|
-| `--capture` | `ssh://host/hw:0,0` | `alsa:hw:1,0`, `pw:<node name>`, `ssh://host/hw:C,D`, or `sim` |
+| `--capture` | `$HIONE_CAPTURE`, else `auto` | `alsa:hw:1,0`, `pw:<node name>`, `ssh://host/hw:C,D`, `auto`, or `sim` |
 | `--rate` | `192000` | Capture rate |
 | `--format` | `S32` | `S16`, `S32` or `F32` |
 | `--device` | `m500` | `m500` (adb), `manual` (you press play), or `sim` |
@@ -119,6 +126,8 @@ Each run gets a directory `hione-out/runs/<id>/`:
 
 Charts come in a light review theme and the dark Hione theme. Exported charts carry the
 device, DAC settings, capture chain and date, and a small Hione mark you can turn off.
+Reports and charts leave out the ssh host of the capture card and the device's adb address,
+since they get published. `run.json` keeps both.
 
 ## Web UI
 
@@ -174,4 +183,6 @@ Levels are dBFS at the card unless `calibrate level` was run.
 
 GPL-3.0-or-later, the same as MikuOS. It is a tool people run and modify, and copyleft keeps
 the modified versions open. Dependencies: gonum (BSD-3-Clause), golang.org/x/image
-(BSD-3-Clause, including the Go fonts), go-pdf/fpdf (MIT).
+(BSD-3-Clause, including the Go fonts), go-pdf/fpdf (MIT), coder/websocket (ISC). The web UI
+uses React (MIT) and the Orbitron font (SIL OFL 1.1). The Hione character art ships under the
+same license for now, see the press kit.

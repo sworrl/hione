@@ -278,6 +278,10 @@ func SetupLineIn(p Parsed) (*Mixer, string, error) {
 	if p.Kind != KindSSH && p.Kind != KindALSA {
 		return &Mixer{p: p}, "", nil
 	}
+	if p.Device == "" || p.Device == "default" {
+		// No card named, so there is no mixer to set. Name the card (alsa:hw:1,0) to get it.
+		return &Mixer{p: p}, "", nil
+	}
 	card := CardOf(p.Device)
 	script := fmt.Sprintf(`set -e
 F=$(mktemp /tmp/hione-mixer.XXXXXX)

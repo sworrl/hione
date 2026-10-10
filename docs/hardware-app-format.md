@@ -13,7 +13,7 @@ curves. This file is the contract between the two.
   "source": "hione",
   "measured": "2026-10-10T16:21:53-04:00",
   "device": "HiBy M500 / MikuOS",
-  "capture": "ssh://host/hw:0,0 192000 Hz S32",
+  "capture": "hw:0,0 over ssh 192000 Hz S32",
   "curves": [
     {
       "id": "20261010-162153-step02",

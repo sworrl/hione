@@ -1,0 +1,25 @@
+mode,filter,gain,dre,high_power,play_rate,level_dbfs,thd_db,thdn_db,noise_dbfs,noise_a_dbfs,snr_a_db,dr_a_db,xtalk_db,balance_db,drift_ppm
+"Fast, low latency, gain low, 44.1 kHz",fast_rolloff_low_latency,low,dremode_enable,hpower_disable,44100,-21.22,-94.76,-69.09,-90.33,-93.31,84.08,84.08,-88.96,-0.08,47.02
+"Fast, low latency, gain high, 44.1 kHz",fast_rolloff_low_latency,high,dremode_enable,hpower_disable,44100,-9.22,-99.43,-81.06,-90.12,-93.17,95.95,95.99,-91.50,-0.08,47.50
+"Fast, phase compensated, gain low, 44.1 kHz",fast_rolloff_phase_compensated,low,dremode_enable,hpower_disable,44100,-21.22,-92.67,-68.90,-90.33,-93.24,84.01,83.96,-91.22,-0.08,47.81
+"Fast, phase compensated, gain high, 44.1 kHz",fast_rolloff_phase_compensated,high,dremode_enable,hpower_disable,44100,-9.22,-99.19,-80.73,-90.38,-93.22,96.00,96.01,-91.10,-0.08,48.04
+"Slow, low latency, gain low, 44.1 kHz",slow_rolloff_low_latency,low,dremode_enable,hpower_disable,44100,-21.22,-93.35,-68.67,-90.33,-93.29,84.07,83.99,-90.62,-0.08,48.15
+"Slow, low latency, gain high, 44.1 kHz",slow_rolloff_low_latency,high,dremode_enable,hpower_disable,44100,-9.22,-98.50,-80.77,-90.17,-93.18,95.96,96.00,-91.72,-0.08,48.36
+"Slow, phase compensated, gain low, 44.1 kHz",slow_rolloff_phase_compensated,low,dremode_enable,hpower_disable,44100,-21.22,-94.13,-69.19,-90.22,-93.18,83.96,83.97,-91.05,-0.08,48.48
+"Slow, phase compensated, gain high, 44.1 kHz",slow_rolloff_phase_compensated,high,dremode_enable,hpower_disable,44100,-9.22,-98.56,-80.77,-90.28,-93.23,96.01,96.12,-90.63,-0.08,48.46
+"NOS, gain low, 44.1 kHz",nos,low,dremode_enable,hpower_disable,44100,-21.22,-92.62,-68.89,-90.32,-93.24,84.02,84.02,-92.95,-0.08,48.26
+"NOS, gain high, 44.1 kHz",nos,high,dremode_enable,hpower_disable,44100,-9.22,-99.88,-80.80,-90.32,-93.27,96.05,95.99,-91.29,-0.08,48.05
+"Fast, low latency, gain low, 96.0 kHz",fast_rolloff_low_latency,low,dremode_enable,hpower_disable,96000,-21.22,-93.09,-68.91,-90.27,-93.20,83.98,83.99,-90.67,-0.08,47.92
+"Fast, low latency, gain high, 96.0 kHz",fast_rolloff_low_latency,high,dremode_enable,hpower_disable,96000,-9.22,-99.32,-80.87,-90.25,-93.25,96.03,96.07,-90.76,-0.08,47.70
+"Fast, phase compensated, gain low, 96.0 kHz",fast_rolloff_phase_compensated,low,dremode_enable,hpower_disable,96000,-21.22,-93.22,-69.15,-90.32,-93.29,84.06,84.10,-91.67,-0.08,47.60
+"Fast, phase compensated, gain high, 96.0 kHz",fast_rolloff_phase_compensated,high,dremode_enable,hpower_disable,96000,-9.22,-99.56,-80.91,-90.35,-93.23,96.01,96.08,-91.30,-0.08,47.61
+"Slow, low latency, gain low, 96.0 kHz",slow_rolloff_low_latency,low,dremode_enable,hpower_disable,96000,-21.22,-92.23,-69.16,-90.29,-93.26,84.04,83.87,-90.48,-0.08,47.75
+"Slow, low latency, gain high, 96.0 kHz",slow_rolloff_low_latency,high,dremode_enable,hpower_disable,96000,-9.22,-100.39,-81.01,-90.31,-93.29,96.07,96.02,-91.06,-0.08,47.48
+"Slow, phase compensated, gain low, 96.0 kHz",slow_rolloff_phase_compensated,low,dremode_enable,hpower_disable,96000,-21.22,-94.71,-69.10,-90.27,-93.30,84.07,84.08,-91.69,-0.08,47.10
+"Slow, phase compensated, gain high, 96.0 kHz",slow_rolloff_phase_compensated,high,dremode_enable,hpower_disable,96000,-9.22,-99.43,-80.84,-90.35,-93.28,96.05,96.10,-90.92,-0.08,46.97
+"NOS, gain low, 96.0 kHz",nos,low,dremode_enable,hpower_disable,96000,-21.22,-93.18,-69.15,-90.30,-93.25,84.02,83.88,-90.98,-0.08,46.78
+"NOS, gain high, 96.0 kHz",nos,high,dremode_enable,hpower_disable,96000,-9.22,-98.79,-81.07,-90.28,-93.21,95.99,95.87,-90.44,-0.08,46.82
+"HP off, DRE off",fast_rolloff_low_latency,high,dremode_disable,hpower_disable,44100,-9.22,-99.44,-80.90,-90.25,-93.24,96.02,95.99,-91.14,-0.08,46.78
+"HP off, DRE on",fast_rolloff_low_latency,high,dremode_enable,hpower_disable,44100,-9.22,-99.84,-80.83,-90.36,-93.27,96.04,96.14,-90.75,-0.08,46.62
+"HP on, DRE off",fast_rolloff_low_latency,high,dremode_disable,hpower_enable,44100,-9.23,-99.49,-80.61,-90.24,-93.25,96.02,96.06,-90.73,-0.11,47.01
+"HP on, DRE on",fast_rolloff_low_latency,high,dremode_enable,hpower_enable,44100,-9.23,-99.38,-80.93,-90.41,-93.28,96.05,96.02,-91.36,-0.11,0.00

@@ -35,7 +35,7 @@ func PDF(r *engine.Run, th *plot.Theme) ([]byte, error) {
 	p.AddPage()
 	p.SetFont("Helvetica", "B", 22)
 	p.SetTextColor(11, 11, 11)
-	dev := r.Device["device"]
+	dev := publicDevice(r.Device["device"])
 	if dev == "" {
 		dev = "Device under test"
 	}
@@ -55,14 +55,14 @@ func PDF(r *engine.Run, th *plot.Theme) ([]byte, error) {
 		p.SetTextColor(82, 81, 78)
 		p.MultiCell(cw-150, 14, tr(v), "", "L", false)
 	}
-	kv("Device", r.Device["device"])
+	kv("Device", publicDevice(r.Device["device"]))
 	kv("Firmware", r.Device["build"])
 	kv("Output", strings.TrimSpace(r.Spec.Jack+" "+r.Device["output"]))
 	kv("Volume", r.Device["volume"])
 	if r.UserDAC != nil {
 		kv("DAC settings before the run", r.UserDAC.String()+" (restored after the run)")
 	}
-	kv("Capture chain", fmt.Sprintf("%s, %s Hz, %s", r.Capture["uri"], r.Capture["rate"], r.Capture["format"]))
+	kv("Capture chain", fmt.Sprintf("%s, %s Hz, %s", publicCapture(r.Capture["uri"]), r.Capture["rate"], r.Capture["format"]))
 	if r.Level != nil {
 		kv("Test level", fmt.Sprintf("%.0f dBFS digital", r.Level.TestLevel))
 		kv("Level check", r.Level.Message)
@@ -164,7 +164,7 @@ func methods(r *engine.Run) []string {
 		"Each mode plays one test file through the device: a start marker, a 1 kHz tone, an exponential sine sweep (Farina method), 32 single-sample impulses, digital silence, a 1 kHz tone 60 dB down, left-only and right-only tones, and an end marker. The device plays it from its own storage, so the digital path is the device's normal playback path.",
 		"The capture is located by the start and end markers. The time between them gives the clock difference between the device and the capture card, and the analysis follows that difference. The frequency response comes from deconvolving the sweep, windowed 5 ms before to 600 ms after the peak, and corrected by the same processing applied to the stimulus itself. The impulse view averages 32 impulses after aligning them to the sub-sample.",
 		"THD and THD+N use a 7-term Blackman-Harris window. THD sums harmonics 2 to 10. THD+N is everything in 20 Hz to 20 kHz except the fundamental. Noise is measured with digital silence playing, in 20 Hz to 20 kHz, unweighted and A-weighted. SNR and dynamic range (AES17, from the tone 60 dB down) are referred to the device's full scale by adding the test level's headroom, which assumes the device stays linear up to 0 dBFS.",
-		"Capture limits: every result includes the capture card's own noise, distortion and anti-alias filter. When a device result is near the card's own floor, the result describes the card. A loopback calibration (the card's output into its input) measures that floor. Capture chain for this run: " + fmt.Sprintf("%s at %s Hz %s.", r.Capture["uri"], r.Capture["rate"], r.Capture["format"]),
+		"Capture limits: every result includes the capture card's own noise, distortion and anti-alias filter. When a device result is near the card's own floor, the result describes the card. A loopback calibration (the card's output into its input) measures that floor. Capture chain for this run: " + fmt.Sprintf("%s at %s Hz %s.", publicCapture(r.Capture["uri"]), r.Capture["rate"], r.Capture["format"]),
 		"Levels are in dBFS of the capture card unless a level calibration was made (a known voltage at the input), in which case output levels are also given in dBV.",
 	}
 }

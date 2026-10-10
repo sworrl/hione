@@ -27,7 +27,7 @@ import (
 
 // Config for an engine.
 type Config struct {
-	Capture   string // capture URI (ssh://host/hw:0,0, alsa:hw:1,0, pw:node, sim)
+	Capture   string // capture URI (ssh://host/hw:0,0, alsa:hw:1,0, pw:node, auto, sim)
 	CapRate   int
 	CapFormat wav.Format
 	OutDir    string

@@ -115,7 +115,7 @@ type ChartSpec struct {
 func (cs ChartSpec) Draw(c plot.Canvas, o Opts) { cs.draw(c, o) }
 
 func stampLines(r *engine.Run) []string {
-	dev := r.Device["device"]
+	dev := publicDevice(r.Device["device"])
 	if b := r.Device["build"]; b != "" {
 		dev += ", " + b
 	}
@@ -125,7 +125,7 @@ func stampLines(r *engine.Run) []string {
 	if v := r.Device["volume"]; v != "" {
 		dev += ", volume " + v
 	}
-	cap := fmt.Sprintf("Capture %s, %s Hz %s", r.Capture["uri"], r.Capture["rate"], r.Capture["format"])
+	cap := fmt.Sprintf("Capture %s, %s Hz %s", publicCapture(r.Capture["uri"]), r.Capture["rate"], r.Capture["format"])
 	if r.Level != nil {
 		cap += fmt.Sprintf(", test level %.0f dBFS", r.Level.TestLevel)
 	}
@@ -402,10 +402,10 @@ th,td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}th:fi
 			fmt.Fprintf(&b, "<tr><td>%s</td><td style=\"text-align:left\">%s</td></tr>", html.EscapeString(k), html.EscapeString(v))
 		}
 	}
-	for _, k := range sortedKeys(r.Device) {
-		kv("Device "+k, r.Device[k])
+	for _, k := range publicDeviceKeys(r) {
+		kv("Device "+k, deviceField(r, k))
 	}
-	kv("Capture", fmt.Sprintf("%s, %s Hz, %s", r.Capture["uri"], r.Capture["rate"], r.Capture["format"]))
+	kv("Capture", fmt.Sprintf("%s, %s Hz, %s", publicCapture(r.Capture["uri"]), r.Capture["rate"], r.Capture["format"]))
 	kv("Output jack", r.Spec.Jack)
 	if r.UserDAC != nil {
 		kv("Your DAC settings (restored after the run)", r.UserDAC.String())
@@ -443,12 +443,12 @@ func writeMarkdown(r *engine.Run, figs []figure) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Measurement report, run %s\n\n", r.ID)
 	fmt.Fprintf(&b, "%s. Status: %s.\n\n", r.Started.Format("2006-01-02 15:04"), r.Status)
-	for _, k := range sortedKeys(r.Device) {
+	for _, k := range publicDeviceKeys(r) {
 		if r.Device[k] != "" {
-			fmt.Fprintf(&b, "- Device %s: %s\n", k, r.Device[k])
+			fmt.Fprintf(&b, "- Device %s: %s\n", k, deviceField(r, k))
 		}
 	}
-	fmt.Fprintf(&b, "- Capture: %s, %s Hz, %s\n", r.Capture["uri"], r.Capture["rate"], r.Capture["format"])
+	fmt.Fprintf(&b, "- Capture: %s, %s Hz, %s\n", publicCapture(r.Capture["uri"]), r.Capture["rate"], r.Capture["format"])
 	if r.UserDAC != nil {
 		fmt.Fprintf(&b, "- DAC settings before the run (restored after): %s\n", r.UserDAC)
 	}
@@ -578,7 +578,7 @@ func WriteHardwareJSON(r *engine.Run, path string) error {
 		port = "3.5mm"
 	}
 	f := HWFile{Format: "hione.curves", Version: 1, Source: "hione", Measured: r.Started.Format(time.RFC3339),
-		Device: r.Device["device"], Capture: fmt.Sprintf("%s %s Hz %s", r.Capture["uri"], r.Capture["rate"], r.Capture["format"])}
+		Device: publicDevice(r.Device["device"]), Capture: fmt.Sprintf("%s %s Hz %s", publicCapture(r.Capture["uri"]), r.Capture["rate"], r.Capture["format"])}
 	for _, st := range r.Steps {
 		if !found(st) {
 			continue

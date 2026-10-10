@@ -1,7 +1,25 @@
+# Measurement output: runs, stimuli, captures, calibration, the pairing token
 /mikumeasure-out/
 /hione-out/
-/bin/
+pairing-token
 *.wav
 *.flac
+
+# Go build output
+/bin/
+/hione
+*.test
+*.out
+*.prof
+
+# Web: dependencies and Vite's default outDir. The real UI build goes to
+# internal/server/ui/ and IS committed, so `go build` alone gives a complete binary.
 /web/node_modules/
 /web/dist/
+
+# Local editor and secrets
+.env
+.env.*
+.vscode/
+.idea/
+.DS_Store

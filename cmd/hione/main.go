@@ -44,7 +44,7 @@ Commands:
   generate    write the stimulus WAVs without playing anything
 
 Common flags (any command):
-  --capture URI     ssh://host/hw:0,0, alsa:hw:1,0, pw:<node>, sim  (default ssh://host/hw:0,0)
+  --capture URI     ssh://host/hw:0,0, alsa:hw:1,0, pw:<node>, auto, sim  (default $HIONE_CAPTURE, else auto)
   --rate HZ         capture rate (default 192000)
   --format F        capture format S16, S32 or F32 (default S32)
   --device D        m500 (adb), manual, or sim (default m500)
@@ -63,9 +63,19 @@ type common struct {
 	noMixer                                   bool
 }
 
+// defaultCapture is $HIONE_CAPTURE, or "auto" (PipeWire, then the ALSA default device). Set
+// HIONE_CAPTURE to the card you measure with, for example ssh://host/hw:0,0, so it is not
+// typed on every run.
+func defaultCapture() string {
+	if v := strings.TrimSpace(os.Getenv("HIONE_CAPTURE")); v != "" {
+		return v
+	}
+	return "auto"
+}
+
 func addCommon(fs *flag.FlagSet) *common {
 	c := &common{}
-	fs.StringVar(&c.capture, "capture", "ssh://host/hw:0,0", "capture URI")
+	fs.StringVar(&c.capture, "capture", defaultCapture(), "capture URI (default $HIONE_CAPTURE, else auto)")
 	fs.IntVar(&c.rate, "rate", 192000, "capture rate")
 	fs.StringVar(&c.format, "format", "S32", "capture format")
 	fs.StringVar(&c.device, "device", "m500", "device under test: m500, manual or sim")
@@ -110,7 +120,7 @@ func (c *common) engine(console bool) (*engine.Engine, error) {
 	if cal.DBVAtFS != nil {
 		dbv = *cal.DBVAtFS
 	}
-	if c.device == "sim" && c.capture == "ssh://host/hw:0,0" {
+	if c.device == "sim" && c.capture == defaultCapture() {
 		c.capture = "sim"
 	}
 	return engine.New(engine.Config{
@@ -166,7 +176,7 @@ func main() {
 
 func cmdDevices(args []string) error {
 	fs := flag.NewFlagSet("devices", flag.ExitOnError)
-	ssh := fs.String("ssh", "", "comma-separated ssh hosts to list too (empty for none)")
+	ssh := fs.String("ssh", os.Getenv("HIONE_SSH_HOSTS"), "comma-separated ssh hosts to list too (default $HIONE_SSH_HOSTS)")
 	fs.Parse(args)
 	var hosts []string
 	for _, h := range strings.Split(*ssh, ",") {
