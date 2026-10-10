@@ -14,9 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/adb"
-	"github.com/sworrl/mikumeasure/internal/capture"
-	"github.com/sworrl/mikumeasure/internal/engine"
+	"github.com/sworrl/hione/internal/adb"
+	"github.com/sworrl/hione/internal/capture"
+	"github.com/sworrl/hione/internal/engine"
+	"github.com/sworrl/hione/internal/plot"
+	"github.com/sworrl/hione/internal/report"
 )
 
 //go:embed static
@@ -147,8 +149,89 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/runs/{id}/files/{path...}", func(w http.ResponseWriter, r *http.Request) {
 		runFile(w, r, r.PathValue("path"))
 	})
+	mux.HandleFunc("GET /api/runs/{id}/charts", func(w http.ResponseWriter, r *http.Request) {
+		run := s.run(r.PathValue("id"))
+		if run == nil {
+			errJSON(w, 404, fmt.Errorf("no run %s", r.PathValue("id")))
+			return
+		}
+		writeJSON(w, 200, report.Charts(run))
+	})
+	mux.HandleFunc("GET /api/runs/{id}/charts/{file}", func(w http.ResponseWriter, r *http.Request) {
+		run := s.run(r.PathValue("id"))
+		if run == nil {
+			errJSON(w, 404, fmt.Errorf("no run %s", r.PathValue("id")))
+			return
+		}
+		file := r.PathValue("file")
+		ext := filepath.Ext(file)
+		cs, ok := report.FindChart(run, strings.TrimSuffix(file, ext))
+		if !ok {
+			errJSON(w, 404, fmt.Errorf("no chart %s", file))
+			return
+		}
+		q := r.URL.Query()
+		o := report.Opts{Theme: plot.ThemeByName(q.Get("theme")), Stamp: q.Get("stamp") != "0", Mark: q.Get("mark") != "0", Transparent: q.Get("bg") == "transparent"}
+		switch ext {
+		case ".svg":
+			w.Header().Set("Content-Type", "image/svg+xml")
+			w.Write(report.SVG(cs, o))
+		case ".png":
+			scale, _ := strconv.ParseFloat(q.Get("scale"), 64)
+			if scale != 1 && scale != 2 && scale != 4 {
+				scale = 2
+			}
+			b, err := report.PNG(cs, o, scale)
+			if err != nil {
+				errJSON(w, 500, err)
+				return
+			}
+			w.Header().Set("Content-Type", "image/png")
+			w.Write(b)
+		default:
+			errJSON(w, 400, fmt.Errorf("use .svg or .png"))
+		}
+	})
+	mux.HandleFunc("GET /api/runs/{id}/export", func(w http.ResponseWriter, r *http.Request) {
+		run := s.run(r.PathValue("id"))
+		if run == nil {
+			errJSON(w, 404, fmt.Errorf("no run %s", r.PathValue("id")))
+			return
+		}
+		q := r.URL.Query()
+		th := plot.ThemeByName(q.Get("theme"))
+		switch q.Get("format") {
+		case "pdf", "":
+			b, err := report.PDF(run, th)
+			if err != nil {
+				errJSON(w, 500, err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/pdf")
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_report_%s.pdf"`, report.FileBase(run), run.ID))
+			w.Write(b)
+		case "zip":
+			b, err := report.Zip(run, th, q.Get("mark") != "0")
+			if err != nil {
+				errJSON(w, 500, err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/zip")
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.zip"`, report.FileBase(run), run.ID))
+			w.Write(b)
+		default:
+			errJSON(w, 400, fmt.Errorf("format is pdf or zip"))
+		}
+	})
 	mux.HandleFunc("GET /api/events", s.events)
 	return mux
+}
+
+func (s *Server) run(id string) *engine.Run {
+	if r := s.E.GetRun(id); r != nil {
+		return r
+	}
+	return loadRun(s.E.Cfg.OutDir, id)
 }
 
 func loadRun(out, id string) *engine.Run {
@@ -163,6 +246,7 @@ func loadRun(out, id string) *engine.Run {
 	if json.Unmarshal(b, &r) != nil {
 		return nil
 	}
+	r.Dir = filepath.Join(out, "runs", id)
 	return &r
 }
 

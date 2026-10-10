@@ -106,6 +106,12 @@ func NewRaster(w, h, scale float64) *Raster {
 	return &Raster{W: w, H: h, scale: scale, img: img}
 }
 
+// NewRasterTransparent makes a fully transparent canvas.
+func NewRasterTransparent(w, h, scale float64) *Raster {
+	img := image.NewRGBA(image.Rect(0, 0, int(w*scale), int(h*scale)))
+	return &Raster{W: w, H: h, scale: scale, img: img}
+}
+
 func (r *Raster) Size() (float64, float64) { return r.W, r.H }
 
 func parseHex(s string) color.RGBA {

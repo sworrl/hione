@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/sworrl/mikumeasure/internal/dsp"
-	"github.com/sworrl/mikumeasure/internal/stim"
+	"github.com/sworrl/hione/internal/dsp"
+	"github.com/sworrl/hione/internal/stim"
 )
 
 // Options for an analysis.

@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/wav"
+	"github.com/sworrl/hione/internal/wav"
 )
 
 // Spec says what to capture.
@@ -280,7 +280,7 @@ func SetupLineIn(p Parsed) (*Mixer, string, error) {
 	}
 	card := CardOf(p.Device)
 	script := fmt.Sprintf(`set -e
-F=$(mktemp /tmp/mikumeasure-mixer.XXXXXX)
+F=$(mktemp /tmp/hione-mixer.XXXXXX)
 alsactl store -f "$F" %[1]s 2>/dev/null
 echo "SAVED=$F"
 c() { amixer -q -c %[1]s sset "$@" 2>/dev/null || true; }

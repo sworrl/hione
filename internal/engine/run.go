@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/adb"
-	"github.com/sworrl/mikumeasure/internal/analysis"
-	"github.com/sworrl/mikumeasure/internal/dsp"
-	"github.com/sworrl/mikumeasure/internal/stim"
+	"github.com/sworrl/hione/internal/adb"
+	"github.com/sworrl/hione/internal/analysis"
+	"github.com/sworrl/hione/internal/dsp"
+	"github.com/sworrl/hione/internal/stim"
 )
 
 // LevelResult is the outcome of the level check.

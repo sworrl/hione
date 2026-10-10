@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/adb"
-	"github.com/sworrl/mikumeasure/internal/analysis"
-	"github.com/sworrl/mikumeasure/internal/engine"
-	"github.com/sworrl/mikumeasure/internal/plot"
+	"github.com/sworrl/hione/internal/adb"
+	"github.com/sworrl/hione/internal/analysis"
+	"github.com/sworrl/hione/internal/engine"
+	"github.com/sworrl/hione/internal/plot"
 )
 
 type figure struct {
@@ -93,16 +93,107 @@ func slug(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// Write renders everything for r into r.Dir.
-func Write(r *engine.Run) error {
-	figDir := filepath.Join(r.Dir, "charts")
-	os.MkdirAll(figDir, 0o755)
-	var figs []figure
-	gs := groups(r)
+// Opts are the export choices for a chart.
+type Opts struct {
+	Theme       *plot.Theme
+	Stamp       bool // bake device, settings, capture chain and date into the chart
+	Mark        bool // the small Hione mark
+	Transparent bool
+}
+
+// ChartSpec is one chart of a run, drawable in any theme.
+type ChartSpec struct {
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Caption string `json:"caption"`
+	W       float64 `json:"w"`
+	H       float64 `json:"h"`
+	draw    func(c plot.Canvas, o Opts)
+}
+
+// Draw renders the chart with o.
+func (cs ChartSpec) Draw(c plot.Canvas, o Opts) { cs.draw(c, o) }
+
+func stampLines(r *engine.Run) []string {
+	dev := r.Device["device"]
+	if b := r.Device["build"]; b != "" {
+		dev += ", " + b
+	}
+	if r.Spec.Jack != "" {
+		dev += ", " + r.Spec.Jack + " out"
+	}
+	if v := r.Device["volume"]; v != "" {
+		dev += ", volume " + v
+	}
+	cap := fmt.Sprintf("Capture %s, %s Hz %s", r.Capture["uri"], r.Capture["rate"], r.Capture["format"])
+	if r.Level != nil {
+		cap += fmt.Sprintf(", test level %.0f dBFS", r.Level.TestLevel)
+	}
+	return []string{dev, cap + ". " + r.Started.Format("2006-01-02 15:04")}
+}
+
+func (o Opts) stamp(r *engine.Run, extra string) *plot.Stamp {
+	if !o.Stamp && !o.Mark {
+		return nil
+	}
+	st := &plot.Stamp{Mark: o.Mark}
+	if o.Stamp {
+		if extra != "" {
+			st.Lines = append(st.Lines, extra)
+		}
+		st.Lines = append(st.Lines, stampLines(r)...)
+	}
+	return st
+}
+
+func commonDAC(steps []*engine.Step) string {
+	if len(steps) == 0 {
+		return ""
+	}
+	d := steps[0].DAC
+	var parts []string
+	same := func(f func(adb.DAC) string) bool {
+		for _, s := range steps {
+			if f(s.DAC) != f(d) {
+				return false
+			}
+		}
+		return f(d) != ""
+	}
+	if same(func(x adb.DAC) string { return x.Filter }) {
+		parts = append(parts, "filter "+adb.FilterLabel(d.Filter))
+	}
+	if same(func(x adb.DAC) string { return x.Gain }) {
+		parts = append(parts, "gain "+d.Gain)
+	}
+	if same(func(x adb.DAC) string { return x.DRE }) {
+		parts = append(parts, "DRE "+onoff(d.DRE == "dremode_enable"))
+	}
+	if same(func(x adb.DAC) string { return x.HP }) {
+		parts = append(parts, "high power "+onoff(d.HP == "hpower_enable"))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "DAC: " + strings.Join(parts, ", ") + ". Other settings as in the legend."
+}
+
+func onoff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
+}
+
+// Charts lists the charts of a run.
+func Charts(r *engine.Run) []ChartSpec {
+	var out []ChartSpec
 	const W, H = 900.0, 520.0
-	for _, g := range gs {
+	capNote := "Left channel."
+	for _, g := range groups(r) {
+		g := g
 		base := slug(g.Title)
-		var fr, top, ir []plot.Series
+		var fr, ir []plot.Series
 		f2 := 20000.0
 		for _, st := range g.Steps {
 			L := st.Result.Ch[0]
@@ -117,26 +208,38 @@ func Write(r *engine.Run) error {
 				ir = append(ir, plot.Series{Name: name, X: xs, Y: L.IR})
 			}
 		}
-		top = fr
-		capNote := fmt.Sprintf("Left channel. Capture %s at %s Hz.", r.Capture["uri"], r.Capture["rate"])
-		chFR := &plot.Chart{Title: "Frequency response: " + g.Title, Subtitle: "dB re 1 kHz, no smoothing", XLabel: "Frequency (Hz)",
-			YLabel: "dB", LogX: true, XMin: 20, XMax: 20000, YMin: -3, YMax: 1, YStep: 0.5, Bands: true, Series: fr, Note: capNote}
-		figs = append(figs, render(figDir, base+"-fr", chFR.Title, W, H, chFR.Draw))
-		chTop := &plot.Chart{Title: "Top octave: " + g.Title, Subtitle: "dB re 1 kHz, where the filters differ", XLabel: "Frequency (Hz)",
-			YLabel: "dB", LogX: true, XMin: 10000, XMax: f2, YMin: -6, YMax: 1, YStep: 1, Series: top, Note: capNote}
-		figs = append(figs, render(figDir, base+"-top", chTop.Title, W, H, chTop.Draw))
+		dac := commonDAC(g.Steps)
+		out = append(out, ChartSpec{ID: base + "-fr", Title: "Frequency response: " + g.Title, W: W, H: H,
+			Caption: "Frequency response re 1 kHz, 20 Hz to 20 kHz, no smoothing. " + dac,
+			draw: func(c plot.Canvas, o Opts) {
+				ch := &plot.Chart{Title: "Frequency response: " + g.Title, Subtitle: "dB re 1 kHz, no smoothing", XLabel: "Frequency (Hz)",
+					YLabel: "dB", LogX: true, XMin: 20, XMax: 20000, YMin: -3, YMax: 1, YStep: 0.5, Bands: true, Series: fr, Note: capNote,
+					Theme: o.Theme, Stamp: o.stamp(r, dac), Transparent: o.Transparent}
+				ch.Draw(c)
+			}})
+		out = append(out, ChartSpec{ID: base + "-top", Title: "Top octave: " + g.Title, W: W, H: H,
+			Caption: "The top octave, where the digital filters differ. " + dac,
+			draw: func(c plot.Canvas, o Opts) {
+				ch := &plot.Chart{Title: "Top octave: " + g.Title, Subtitle: "dB re 1 kHz", XLabel: "Frequency (Hz)",
+					YLabel: "dB", LogX: true, XMin: 10000, XMax: f2, YMin: -6, YMax: 1, YStep: 1, Series: fr, Note: capNote,
+					Theme: o.Theme, Stamp: o.stamp(r, dac), Transparent: o.Transparent}
+				ch.Draw(c)
+			}})
 		if len(ir) > 0 {
-			chIR := &plot.Chart{Title: "Impulse response: " + g.Title, Subtitle: "Average of 32 single-sample impulses, normalized to the peak",
-				XLabel: "Time re peak (ms)", YLabel: "", XMin: -1, XMax: 3, YMin: -0.4, YMax: 1.1, YStep: 0.2, Series: ir, Note: capNote}
-			figs = append(figs, render(figDir, base+"-ir", chIR.Title, W, H, chIR.Draw))
+			out = append(out, ChartSpec{ID: base + "-ir", Title: "Impulse response: " + g.Title, W: W, H: H,
+				Caption: "Average of 32 single-sample impulses, normalized to the peak. Pre-ringing shows up left of 0 ms. " + dac,
+				draw: func(c plot.Canvas, o Opts) {
+					ch := &plot.Chart{Title: "Impulse response: " + g.Title, Subtitle: "Average of 32 single-sample impulses, normalized to the peak",
+						XLabel: "Time re peak (ms)", XMin: -1, XMax: 3, YMin: -0.4, YMax: 1.1, YStep: 0.2, Series: ir, Note: capNote,
+						Theme: o.Theme, Stamp: o.stamp(r, dac), Transparent: o.Transparent}
+					ch.Draw(c)
+				}})
 		}
-		// Phase and group delay for the first step of the group, as a sample.
 	}
-	// THD+N bars over every step.
 	var labels []string
 	var vals []float64
 	for _, st := range r.Steps {
-		if !found(st) || st.Result.Ch[0].Tone == nil {
+		if !found(st) || st.Result.Ch[0].Tone == nil || st.Result.Ch[0].Tone.THDN < -900 {
 			continue
 		}
 		labels = append(labels, st.Label)
@@ -144,11 +247,53 @@ func Write(r *engine.Run) error {
 	}
 	if len(vals) > 0 {
 		lo := math.Floor(minF(vals)/10)*10 - 10
-		b := &plot.Bars{Title: "THD+N at 1 kHz, left", Subtitle: fmt.Sprintf("dB re the fundamental, 20 Hz to 20 kHz, test level %s", levelText(r)), Unit: "dB",
-			Labels: labels, Values: vals, Min: lo, Max: math.Max(-20, maxF(vals)+5)}
-		figs = append(figs, render(figDir, "thdn", b.Title, W, 70+float64(len(vals))*22+40, b.Draw))
+		hi := math.Max(-20, maxF(vals)+5)
+		h := 70 + float64(len(vals))*22 + 40
+		out = append(out, ChartSpec{ID: "thdn", Title: "THD+N at 1 kHz", W: W, H: h + 44,
+			Caption: fmt.Sprintf("THD+N at 1 kHz, left channel, 20 Hz to 20 kHz, re the fundamental, test level %s.", levelText(r)),
+			draw: func(c plot.Canvas, o Opts) {
+				b := &plot.Bars{Title: "THD+N at 1 kHz, left", Subtitle: fmt.Sprintf("dB re the fundamental, 20 Hz to 20 kHz, test level %s. Lower is better.", levelText(r)), Unit: "dB",
+					Labels: labels, Values: vals, Min: lo, Max: hi, Theme: o.Theme, Stamp: o.stamp(r, ""), Transparent: o.Transparent}
+				b.Draw(c)
+			}})
 	}
-	if err := writeHTML(r, gs, figs); err != nil {
+	return out
+}
+
+// SVG renders one chart.
+func SVG(cs ChartSpec, o Opts) []byte {
+	s := plot.NewSVG(cs.W, cs.H)
+	cs.Draw(s, o)
+	return s.Bytes()
+}
+
+// PNG renders one chart at scale (1, 2, 4).
+func PNG(cs ChartSpec, o Opts, scale float64) ([]byte, error) {
+	var r *plot.Raster
+	if o.Transparent {
+		r = plot.NewRasterTransparent(cs.W, cs.H, scale)
+	} else {
+		r = plot.NewRaster(cs.W, cs.H, scale)
+	}
+	cs.Draw(r, o)
+	return r.PNG()
+}
+
+// Write renders everything for r into r.Dir.
+func Write(r *engine.Run) error {
+	figDir := filepath.Join(r.Dir, "charts")
+	os.MkdirAll(figDir, 0o755)
+	var figs []figure
+	o := Opts{Theme: plot.Light, Stamp: true, Mark: true}
+	for _, cs := range Charts(r) {
+		svg := SVG(cs, o)
+		os.WriteFile(filepath.Join(figDir, cs.ID+".svg"), svg, 0o644)
+		if b, err := PNG(cs, o, 2); err == nil {
+			os.WriteFile(filepath.Join(figDir, cs.ID+".png"), b, 0o644)
+		}
+		figs = append(figs, figure{File: "charts/" + cs.ID, Caption: cs.Caption, SVG: string(SVG(cs, Opts{Theme: plot.Light}))})
+	}
+	if err := writeHTML(r, groups(r), figs); err != nil {
 		return err
 	}
 	if err := writeMarkdown(r, figs); err != nil {
@@ -156,6 +301,9 @@ func Write(r *engine.Run) error {
 	}
 	if err := writeSummaryCSV(r); err != nil {
 		return err
+	}
+	if b, err := PDF(r, plot.Light); err == nil {
+		os.WriteFile(filepath.Join(r.Dir, "report.pdf"), b, 0o644)
 	}
 	return WriteHardwareJSON(r, filepath.Join(r.Dir, "hardware-curves.json"))
 }
@@ -187,10 +335,6 @@ func maxF(v []float64) float64 {
 	return m
 }
 
-func render(dir, name, caption string, w, h float64, fn func(plot.Canvas)) figure {
-	plot.WriteBoth(filepath.Join(dir, name), w, h, fn)
-	return figure{File: "charts/" + name, Caption: caption, SVG: plot.SVGString(w, h, fn)}
-}
 
 func f1(v float64) string {
 	if math.IsNaN(v) || v < -900 {
@@ -232,14 +376,14 @@ func rows(r *engine.Run) []row {
 
 func chainNote(r *engine.Run) string {
 	return "Every number here went through the capture card's input, so its own noise, distortion and filter are part of each result. " +
-		"Results close to the card's own limits measure the card, not the device. Run \"mikumeasure calibrate loopback\" to measure those limits, " +
+		"Results close to the card's own limits measure the card, not the device. Run \"hione calibrate loopback\" to measure those limits, " +
 		"and the report then lists them next to the device's numbers. Noise and SNR are in capture dBFS and re the device's full scale, " +
 		"extrapolated from the test level, because the device was never driven to 0 dBFS."
 }
 
 func writeHTML(r *engine.Run, gs []group, figs []figure) error {
 	var b strings.Builder
-	b.WriteString(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>mikumeasure report</title><style>
+	b.WriteString(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hione report</title><style>
 :root{color-scheme:light;--bg:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--line:#e3e2de}
 body{margin:0 auto;max-width:960px;padding:16px;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 h1{font-size:22px}h2{font-size:17px;margin-top:28px}figure{margin:16px 0}figure svg{width:100%;height:auto;border:1px solid var(--line);border-radius:6px}
@@ -433,7 +577,7 @@ func WriteHardwareJSON(r *engine.Run, path string) error {
 	if port == "" {
 		port = "3.5mm"
 	}
-	f := HWFile{Format: "mikumeasure.curves", Version: 1, Source: "mikumeasure", Measured: r.Started.Format(time.RFC3339),
+	f := HWFile{Format: "hione.curves", Version: 1, Source: "hione", Measured: r.Started.Format(time.RFC3339),
 		Device: r.Device["device"], Capture: fmt.Sprintf("%s %s Hz %s", r.Capture["uri"], r.Capture["rate"], r.Capture["format"])}
 	for _, st := range r.Steps {
 		if !found(st) {

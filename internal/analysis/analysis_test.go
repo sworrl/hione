@@ -4,9 +4,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/sworrl/mikumeasure/internal/dsp"
-	"github.com/sworrl/mikumeasure/internal/sim"
-	"github.com/sworrl/mikumeasure/internal/stim"
+	"github.com/sworrl/hione/internal/dsp"
+	"github.com/sworrl/hione/internal/sim"
+	"github.com/sworrl/hione/internal/stim"
 )
 
 // End to end through the simulator: every number the model sets must come back.

@@ -8,7 +8,7 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/sworrl/mikumeasure/internal/dsp"
+	"github.com/sworrl/hione/internal/dsp"
 )
 
 // Model of the device and capture chain.

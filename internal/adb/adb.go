@@ -21,7 +21,7 @@ type Device struct {
 
 // DeviceDir is where test files go on the device. It is under Music so Miku Music (which has
 // all-files access) can read it; a .nomedia file keeps it out of the library.
-const DeviceDir = "/sdcard/Music/mikumeasure"
+const DeviceDir = "/sdcard/Music/hione"
 
 var devLine = regexp.MustCompile(`^(\S+)\s+(\S+)\s+(.*)$`)
 
@@ -219,7 +219,7 @@ func (d *Device) Broadcast(action string, extras ...string) (string, error) {
 		return "", fmt.Errorf("%s: no result from Miku Music: %s", action, out)
 	}
 	if m[1] == "0" && m[2] == "" {
-		return "", fmt.Errorf("%s: Miku Music did not handle it (needs the build with the mikumeasure shell commands)", action)
+		return "", fmt.Errorf("%s: Miku Music did not handle it (needs the build with the measurement shell commands (PLAY_FILE, DAC_SET))", action)
 	}
 	if m[1] != "1" {
 		return m[2], fmt.Errorf("%s: %s", action, m[2])

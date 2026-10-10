@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/adb"
+	"github.com/sworrl/hione/internal/adb"
 )
 
 // Player is the device side: whatever plays the test file.
@@ -102,7 +102,8 @@ func (p *adbPlayer) LowerVolume() bool {
 
 func (p *adbPlayer) Info() map[string]string {
 	return map[string]string{
-		"device":  "HiBy M500 (" + p.d.Label + ")",
+		"device":  "HiBy M500 / MikuOS",
+		"adb":     p.d.Label,
 		"build":   p.d.Model(),
 		"volume":  p.d.Volume(),
 		"output":  WiredOutput(p.d),

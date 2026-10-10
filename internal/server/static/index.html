@@ -1,32 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mikumeasure</title>
+<title>Hione</title>
 <style>
 :root {
   color-scheme: light;
   --bg: #f4f3f0; --surface: #fcfcfb; --surface-2: #ffffff; --line: #d9d8d4; --line-2: #eeede9;
   --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #8a8984;
-  --accent: #2a78d6; --good: #008300; --warn: #c98500; --bad: #e34948;
+  --accent: #c77700; --accent-ink: #ffffff; --good: #008300; --warn: #c98500; --bad: #e34948;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #121211; --surface: #1a1a19; --surface-2: #20201f; --line: #3a3a37; --line-2: #2a2a28;
+    --bg: #111216; --surface: #16181d; --surface-2: #1c1f25; --line: #2e3138; --line-2: #1f2228;
     --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
-    --accent: #3987e5; --good: #2fa52f; --warn: #c98500; --bad: #e66767;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --accent: #ffab2e; --accent-ink: #111216; --good: #2fa52f; --warn: #ffab2e; --bad: #e66767;
+    --s1:#8ec5ff; --s2:#ffab2e; --s3:#1fbf87; --s4:#e87ba4; --s5:#9085e9; --s6:#e66767; --s7:#c9d94a; --s8:#f0efec;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #121211; --surface: #1a1a19; --surface-2: #20201f; --line: #3a3a37; --line-2: #2a2a28;
+  --bg: #111216; --surface: #16181d; --surface-2: #1c1f25; --line: #2e3138; --line-2: #1f2228;
   --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
-  --accent: #3987e5; --good: #2fa52f; --warn: #c98500; --bad: #e66767;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --accent: #ffab2e; --accent-ink: #111216; --good: #2fa52f; --warn: #ffab2e; --bad: #e66767;
+  --s1:#8ec5ff; --s2:#ffab2e; --s3:#1fbf87; --s4:#e87ba4; --s5:#9085e9; --s6:#e66767; --s7:#c9d94a; --s8:#f0efec;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -42,14 +42,15 @@ main { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; padding
 canvas { width: 100%; display: block; }
 .meters { display: grid; grid-template-columns: 22px 1fr 64px; gap: 6px 8px; align-items: center; font-variant-numeric: tabular-nums; }
 .meter { position: relative; height: 18px; background: var(--line-2); border-radius: 4px; overflow: hidden; }
-.meter .rms { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); opacity: .55; }
+.meter .rms { position: absolute; left: 0; top: 0; bottom: 0; background: var(--s1); opacity: .7; }
 .meter .pk { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--ink); }
 .meter .zone { position: absolute; top: 0; bottom: 0; right: 0; background: color-mix(in srgb, var(--bad) 18%, transparent); }
 .clip { font-size: 11px; font-weight: 700; color: var(--surface); background: var(--line); border-radius: 3px; padding: 1px 4px; text-align: center; }
 .clip.on { background: var(--bad); }
 .scale { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); margin: 2px 0 0 30px; padding-right: 72px; }
+select { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 6px; padding: 5px 6px; max-width: 100%; }
 button { font: inherit; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 button:disabled { opacity: .5; cursor: default; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
 .opts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
@@ -65,17 +66,17 @@ table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-
 th, td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--line-2); }
 th:first-child, td:first-child { text-align: left; }
 th { color: var(--ink-2); font-weight: 600; }
-.bar { height: 10px; background: var(--accent); border-radius: 2px; display: inline-block; vertical-align: middle; }
+.bar { height: 10px; background: var(--s1); border-radius: 2px; display: inline-block; vertical-align: middle; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; padding: 3px 10px; font-size: 12px; }
-.seg button.on { background: var(--accent); color: #fff; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
 a { color: var(--accent); }
 .status-pass { color: var(--good); font-weight: 600; } .status-fail { color: var(--bad); font-weight: 600; }
 </style>
 </head>
 <body>
 <header>
-  <h1>mikumeasure</h1>
+  <h1>Hione <span style="font-weight:400;color:var(--ink-3);font-size:13px">audio measurement</span></h1>
   <span class="chip">capture <b id="cap">-</b></span>
   <span class="chip">device <b id="dev">-</b></span>
   <span class="chip">DAC <b id="dac">-</b></span>
@@ -83,6 +84,7 @@ a { color: var(--accent); }
   <span class="chip">volume <b id="vol">-</b></span>
   <span class="chip">test level <b id="lvl">-</b></span>
   <span class="chip" id="busy">idle</span>
+  <button id="themeBtn" style="margin-left:auto;padding:2px 10px;font-size:12px">Light</button>
 </header>
 <main>
   <section class="card w5">
@@ -142,6 +144,17 @@ a { color: var(--accent); }
     <div style="overflow-x:auto"><table id="resTable"><thead><tr><th>Mode</th><th>Level dBFS</th><th>THD+N dB</th><th></th><th>Noise dBFS(A)</th><th>SNR dB(A)</th><th>DR dB(A)</th><th>Xtalk dB</th><th>Bal dB</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section class="card w5">
+    <h2>Export</h2>
+    <div class="controls">
+      <select id="exChart"></select>
+      <select id="exFmt"><option value="svg">SVG</option><option value="png1">PNG 1x</option><option value="png2" selected>PNG 2x</option><option value="png4">PNG 4x</option></select>
+      <select id="exTheme"><option value="light">Light</option><option value="dark">Dark</option></select>
+      <label class="muted"><input type="checkbox" id="exMark" checked> Hione mark</label>
+      <label class="muted"><input type="checkbox" id="exStamp" checked> settings line</label>
+      <label class="muted"><input type="checkbox" id="exClear"> transparent</label>
+      <button id="exOne">Save chart</button>
+    </div>
+    <div class="controls"><button id="exPdf">Report PDF</button><button id="exZip">Everything (zip)</button></div>
     <h2>Log</h2>
     <div id="log"></div>
   </section>
@@ -306,6 +319,7 @@ async function loadRun(id) {
   try {
     runData = await api('/api/runs/' + id);
     currentRun = id;
+    loadCharts(id);
     drawResults();
     const done = runData.status !== 'running';
     $('reportLink').innerHTML = done ? `Run ${id}: ${runData.status}. <a href="/api/report/${id}" target="_blank">Open report</a> · <a href="/api/runs/${id}" target="_blank">JSON</a>` : `Run ${id} in progress.`;
@@ -366,6 +380,37 @@ function drawResults() {
 document.querySelectorAll('#frZoom button').forEach(b => b.onclick = () => {
   frZoom = b.dataset.z; document.querySelectorAll('#frZoom button').forEach(x => x.classList.toggle('on', x === b)); drawResults();
 });
+
+// ---- theme ----
+(function () {
+  let t = 'dark'; try { t = localStorage.getItem('hione-theme') || 'dark'; } catch (e) {}
+  const apply = () => { document.documentElement.dataset.theme = t; $('themeBtn').textContent = t === 'dark' ? 'Light' : 'Dark'; };
+  apply();
+  $('themeBtn').onclick = () => { t = t === 'dark' ? 'light' : 'dark'; try { localStorage.setItem('hione-theme', t); } catch (e) {} apply(); drawResults(); };
+})();
+
+// ---- export ----
+async function loadCharts(id) {
+  try {
+    const cs = await api('/api/runs/' + id + '/charts');
+    const sel = $('exChart'); const prev = sel.value; sel.innerHTML = '';
+    for (const c of cs) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.title; sel.appendChild(o); }
+    if (prev) sel.value = prev;
+  } catch (e) {}
+}
+function exportURL(kind) {
+  const id = currentRun; if (!id) return null;
+  const th = $('exTheme').value, mark = $('exMark').checked ? 1 : 0;
+  if (kind === 'pdf') return `/api/runs/${id}/export?format=pdf&theme=${th}`;
+  if (kind === 'zip') return `/api/runs/${id}/export?format=zip&theme=${th}&mark=${mark}`;
+  const f = $('exFmt').value, ch = $('exChart').value; if (!ch) return null;
+  const q = `theme=${th}&mark=${mark}&stamp=${$('exStamp').checked ? 1 : 0}` + ($('exClear').checked ? '&bg=transparent' : '');
+  return f === 'svg' ? `/api/runs/${id}/charts/${ch}.svg?${q}` : `/api/runs/${id}/charts/${ch}.png?scale=${f.slice(3)}&${q}`;
+}
+function download(url) { if (!url) { log('Nothing to export yet.'); return; } const a = document.createElement('a'); a.href = url; a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
+$('exOne').onclick = () => download(exportURL('chart'));
+$('exPdf').onclick = () => download(exportURL('pdf'));
+$('exZip').onclick = () => download(exportURL('zip'));
 
 // ---- controls ----
 function vals(cls) { return [...document.querySelectorAll('.' + cls)].filter(x => x.checked).map(x => x.value); }

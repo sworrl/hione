@@ -1,6 +1,6 @@
-// Command mikumeasure measures audio devices: frequency response, distortion, noise, crosstalk
+// Command hione measures audio devices: frequency response, distortion, noise, crosstalk
 // and impulse response, through a capture card, with an automated DAC matrix for the HiBy M500
-// on MikuOS. Run "mikumeasure help" for the commands.
+// on MikuOS. Run "hione help" for the commands.
 package main
 
 import (
@@ -21,17 +21,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/adb"
-	"github.com/sworrl/mikumeasure/internal/analysis"
-	"github.com/sworrl/mikumeasure/internal/capture"
-	"github.com/sworrl/mikumeasure/internal/engine"
-	"github.com/sworrl/mikumeasure/internal/report"
-	"github.com/sworrl/mikumeasure/internal/server"
-	"github.com/sworrl/mikumeasure/internal/stim"
-	"github.com/sworrl/mikumeasure/internal/wav"
+	"github.com/sworrl/hione/internal/adb"
+	"github.com/sworrl/hione/internal/analysis"
+	"github.com/sworrl/hione/internal/capture"
+	"github.com/sworrl/hione/internal/engine"
+	"github.com/sworrl/hione/internal/report"
+	"github.com/sworrl/hione/internal/server"
+	"github.com/sworrl/hione/internal/stim"
+	"github.com/sworrl/hione/internal/wav"
 )
 
-const usage = `mikumeasure: audio measurements through a capture card.
+const usage = `Hione: audio measurement through a capture card.
 
 Commands:
   devices     list capture and playback devices (local, ssh hosts, adb)
@@ -50,10 +50,10 @@ Common flags (any command):
   --device D        m500 (adb), manual, or sim (default m500)
   --adb SERIAL      adb serial or t:<transport id> (default: first MikuOS device)
   --level DB        test level in dBFS (default -12, no louder than -6)
-  --out DIR         output directory (default ./mikumeasure-out)
+  --out DIR         output directory (default ./hione-out)
   --no-mixer        leave the capture card's mixer as it is
 
-Run "mikumeasure <command> -h" for the command's own flags.
+Run "hione <command> -h" for the command's own flags.
 `
 
 type common struct {
@@ -71,7 +71,7 @@ func addCommon(fs *flag.FlagSet) *common {
 	fs.StringVar(&c.device, "device", "m500", "device under test: m500, manual or sim")
 	fs.StringVar(&c.adbSerial, "adb", "", "adb serial or t:<id>")
 	fs.Float64Var(&c.level, "level", -12, "test level, dBFS")
-	fs.StringVar(&c.out, "out", "mikumeasure-out", "output directory")
+	fs.StringVar(&c.out, "out", "hione-out", "output directory")
 	fs.BoolVar(&c.noMixer, "no-mixer", false, "leave the mixer alone")
 	fs.StringVar(&c.cal, "cal", "", "capture calibration JSON (default <out>/calibration.json when present)")
 	return c
@@ -235,7 +235,7 @@ func cmdServe(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("mikumeasure UI: http://%s/\n", ln.Addr())
+	fmt.Printf("Hione UI: http://%s/\n", ln.Addr())
 	srv := &server.Server{E: e}
 	return http.Serve(ln, srv.Handler())
 }
@@ -357,7 +357,7 @@ func cmdCalibrate(args []string) error {
 		cal.DBVAtFS = &v
 		fmt.Printf("Input reads %.2f dBFS for %.4f Vrms: 0 dBFS = %.2f dBV (%.3f Vrms).\n", lv, *vrms, v, math.Pow(10, v/20))
 	}
-	cal.Notes = fmt.Sprintf("capture %s at %d Hz %s, mixer set by mikumeasure (line input, no boost, capture 0 dB). A different mixer setting invalidates the level calibration.", c.capture, c.rate, c.format)
+	cal.Notes = fmt.Sprintf("capture %s at %d Hz %s, mixer set by Hione (line input, no boost, capture 0 dB). A different mixer setting invalidates the level calibration.", c.capture, c.rate, c.format)
 	b, _ := json.MarshalIndent(cal, "", " ")
 	os.MkdirAll(filepath.Dir(c.calPath()), 0o755)
 	if err := os.WriteFile(c.calPath(), b, 0o644); err != nil {
@@ -371,7 +371,7 @@ func cmdReport(args []string) error {
 	fs := flag.NewFlagSet("report", flag.ExitOnError)
 	fs.Parse(args)
 	if fs.NArg() != 1 {
-		return errors.New("give a run directory (mikumeasure-out/runs/<id>)")
+		return errors.New("give a run directory (hione-out/runs/<id>)")
 	}
 	b, err := os.ReadFile(filepath.Join(fs.Arg(0), "run.json"))
 	if err != nil {
@@ -394,7 +394,7 @@ func cmdGenerate(args []string) error {
 	plan := fs.String("plan", "quick", "quick, full or level")
 	rates := fs.String("rates", "44100,48000,96000,192000", "rates")
 	level := fs.Float64("level", -12, "test level, dBFS")
-	out := fs.String("out", "mikumeasure-out/stimuli", "directory")
+	out := fs.String("out", "hione-out/stimuli", "directory")
 	fs.Parse(args)
 	rs, err := parseInts(*rates)
 	if err != nil {
@@ -406,7 +406,7 @@ func cmdGenerate(args []string) error {
 		if err != nil {
 			return err
 		}
-		path := filepath.Join(*out, fmt.Sprintf("mikumeasure-%s-%.0fdB-%d.wav", p.Name, -p.Level, r))
+		path := filepath.Join(*out, fmt.Sprintf("hione-%s-%.0fdB-%d.wav", p.Name, -p.Level, r))
 		if err := wav.Write(path, &wav.Audio{Rate: r, Format: wav.S24, Data: p.Render(float64(r), 24)}); err != nil {
 			return err
 		}

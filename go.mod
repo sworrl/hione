@@ -1,4 +1,4 @@
-module github.com/sworrl/mikumeasure
+module github.com/sworrl/hione
 
 go 1.22
 
@@ -7,4 +7,7 @@ require (
 	gonum.org/v1/gonum v0.15.1
 )
 
-require golang.org/x/text v0.22.0 // indirect
+require (
+	github.com/go-pdf/fpdf v0.9.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
+)

@@ -15,13 +15,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/adb"
-	"github.com/sworrl/mikumeasure/internal/analysis"
-	"github.com/sworrl/mikumeasure/internal/capture"
-	"github.com/sworrl/mikumeasure/internal/dsp"
-	"github.com/sworrl/mikumeasure/internal/sim"
-	"github.com/sworrl/mikumeasure/internal/stim"
-	"github.com/sworrl/mikumeasure/internal/wav"
+	"github.com/sworrl/hione/internal/adb"
+	"github.com/sworrl/hione/internal/analysis"
+	"github.com/sworrl/hione/internal/capture"
+	"github.com/sworrl/hione/internal/dsp"
+	"github.com/sworrl/hione/internal/sim"
+	"github.com/sworrl/hione/internal/stim"
+	"github.com/sworrl/hione/internal/wav"
 )
 
 // Config for an engine.
@@ -299,7 +299,7 @@ func (e *Engine) CaptureError() string { return e.capErr }
 func (e *Engine) StimFile(plan *stim.Plan, rate int) (string, error) {
 	dir := filepath.Join(e.Cfg.OutDir, "stimuli")
 	os.MkdirAll(dir, 0o755)
-	name := fmt.Sprintf("mikumeasure-v2-%s-%.0fdB-%d.wav", plan.Name, -plan.Level, rate)
+	name := fmt.Sprintf("hione-v2-%s-%.0fdB-%d.wav", plan.Name, -plan.Level, rate)
 	path := filepath.Join(dir, name)
 	if _, err := os.Stat(path); err == nil {
 		return path, nil

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/dsp"
+	"github.com/sworrl/hione/internal/dsp"
 )
 
 // Live is the rolling view of the capture for the meters, spectrum and spectrogram.

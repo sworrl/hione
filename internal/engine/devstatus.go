@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sworrl/mikumeasure/internal/adb"
+	"github.com/sworrl/hione/internal/adb"
 )
 
 // DeviceStatus is the last thing the poller read from the device, with where each value came from.
