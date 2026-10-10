@@ -235,6 +235,8 @@ function stepKey(s: Step) { return s.label; }
 
 function Results({ run, theme, api, demo }: { run: Run | null; theme: Theme; api: Api; demo: boolean }) {
   const [zoom, setZoom] = useState<'full' | 'top' | 'wide'>('full');
+  const [smooth, setSmooth] = useState(0);
+  const [kind, setKind] = useState<'mag' | 'phase' | 'gd'>('mag');
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [group, setGroup] = useState<string>('all');
   const [hover, setHover] = useState<number | null>(null);
@@ -257,10 +259,16 @@ function Results({ run, theme, api, demo }: { run: Run | null; theme: Theme; api
   const shown = steps.filter(inGroup);
   const color = (i: number) => theme.series[i % theme.series.length];
   const maxF = Math.max(20000, ...shown.map(s => { const hz = s.result!.channels[0].fr.hz; return hz[hz.length - 1]; }));
-  const view: View = zoom === 'top' ? { xmin: 10000, xmax: maxF, ymin: -6, ymax: 1, logx: true }
-    : zoom === 'wide' ? { xmin: 10, xmax: maxF, ymin: -12, ymax: 2, logx: true }
-      : { xmin: 20, xmax: 20000, ymin: -3, ymax: 1, logx: true };
-  const frSeries: Series[] = shown.map((s, i) => ({ key: stepKey(s), x: s.result!.channels[0].fr.hz, y: s.result!.channels[0].fr.db, color: color(i) })).filter(s => !hidden[s.key]);
+  const xr = zoom === 'top' ? [10000, maxF] : zoom === 'wide' ? [10, maxF] : [20, 20000];
+  const yr = kind === 'phase' ? [-180, 180] : kind === 'gd' ? [-0.5, 1.5] : zoom === 'top' ? [-6, 1] : zoom === 'wide' ? [-12, 2] : [-3, 1];
+  const view: View = { xmin: xr[0], xmax: xr[1], ymin: yr[0], ymax: yr[1], logx: true };
+  const pick = (s: Step) => {
+    const fr = s.result!.channels[0].fr;
+    if (kind === 'phase') return fr.phase || [];
+    if (kind === 'gd') return fr.gd || [];
+    return smooth ? smoothDB(fr.db, 48 / smooth) : fr.db;
+  };
+  const frSeries: Series[] = shown.map((s, i) => ({ key: stepKey(s), x: s.result!.channels[0].fr.hz, y: pick(s), color: color(i) })).filter(s => !hidden[s.key]);
   const irSeries: Series[] = shown.map((s, i) => {
     const ch = s.result!.channels[0];
     const ir = ch.ir || [];
@@ -270,7 +278,7 @@ function Results({ run, theme, api, demo }: { run: Run | null; theme: Theme; api
   const hoverVals = hover !== null ? shown.filter(s => !hidden[stepKey(s)]).map((s, i) => {
     const fr = s.result!.channels[0].fr;
     let k = 0; while (k < fr.hz.length - 1 && fr.hz[k] < hover) k++;
-    return { name: label(s), v: fr.db[k], c: color(shown.indexOf(s)), i };
+    return { name: label(s), v: pick(s)[k], c: color(shown.indexOf(s)), i };
   }) : [];
   return (
     <>
@@ -282,14 +290,16 @@ function Results({ run, theme, api, demo }: { run: Run | null; theme: Theme; api
           </div>
         </div>
         <div className="row small">
+          <select value={kind} onChange={e => setKind(e.target.value as 'mag' | 'phase' | 'gd')}><option value="mag">Magnitude</option><option value="phase">Phase</option><option value="gd">Group delay</option></select>
+          <select value={smooth} disabled={kind !== 'mag'} onChange={e => setSmooth(+e.target.value)}><option value={0}>No smoothing</option><option value={3}>1/3 octave</option><option value={6}>1/6 octave</option><option value={12}>1/12 octave</option></select>
           <select value={group} onChange={e => setGroup(e.target.value)}>
             <option value="all">All modes</option>
             {groups.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           {run && <span className="muted">Run {run.id} · {run.status}{demo ? ' · recorded' : ''}</span>}
         </div>
-        {shown.length === 0 ? <Empty /> : <LineChart view={view} theme={theme} unit="dB re 1 kHz" bands={zoom === 'full'} height={340} series={frSeries} onHover={setHover} />}
-        <div className="hover">{hover !== null && <><b>{freqLabel(hover)} Hz</b>{hoverVals.map(h => <span key={h.name}><i style={{ background: h.c }} />{h.name} {fmt(h.v, 2)} dB</span>)}</>}</div>
+        {shown.length === 0 ? <Empty /> : <LineChart view={view} theme={theme} unit={kind === 'phase' ? 'degrees' : kind === 'gd' ? 'ms' : 'dB re 1 kHz'} bands={zoom === 'full'} height={340} series={frSeries} onHover={setHover} />}
+        <div className="hover">{hover !== null && <><b>{freqLabel(hover)} Hz</b>{hoverVals.map(h => <span key={h.name}><i style={{ background: h.c }} />{h.name} {fmt(h.v, 2)} {kind === 'phase' ? 'deg' : kind === 'gd' ? 'ms' : 'dB'}</span>)}</>}</div>
         <div className="toggles">
           {shown.map((s, i) => (
             <label key={stepKey(s)}><input type="checkbox" checked={!hidden[stepKey(s)]} onChange={e => setHidden({ ...hidden, [stepKey(s)]: !e.target.checked })} /><i style={{ background: color(i) }} />{label(s)}</label>
@@ -304,6 +314,17 @@ function Results({ run, theme, api, demo }: { run: Run | null; theme: Theme; api
       </section>
     </>
   );
+}
+
+/** Fractional-octave smoothing on the 48-points-per-octave grid: power average over w points. */
+function smoothDB(db: number[], w: number): number[] {
+  const half = Math.max(1, Math.round(w / 2));
+  const p = db.map(v => Math.pow(10, v / 10));
+  return db.map((_, i) => {
+    let s = 0, n = 0;
+    for (let k = Math.max(0, i - half); k <= Math.min(db.length - 1, i + half); k++) { s += p[k]; n++; }
+    return 10 * Math.log10(s / n);
+  });
 }
 
 function Empty() {

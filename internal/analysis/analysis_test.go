@@ -104,3 +104,40 @@ func TestNoSignal(t *testing.T) {
 		t.Fatal("no idle noise")
 	}
 }
+
+// The full plan: stepped sines, level steps and IMD come out with sane numbers.
+func TestFullPlan(t *testing.T) {
+	plan, err := stim.Build(stim.Options{Name: "full", Level: -12, PlayRate: 48000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := sim.Model{GainDB: -2, H3: 0.01, NoiseDBFS: -110, XtalkDB: -999, Delay: 0.2, Seed: 4}
+	rec := m.Apply(plan.Render(48000, 0), 48000, 48000)
+	r := Analyze(rec, plan, Options{PlayRate: 48000, CapRate: 48000, DBVAtFS: math.NaN()})
+	if !r.Found {
+		t.Fatal(r.Message)
+	}
+	L := r.Ch[0]
+	if len(L.THDvsF) < 9 || len(L.THDvsL) != 9 {
+		t.Fatalf("steps: %d vs freq, %d vs level", len(L.THDvsF), len(L.THDvsL))
+	}
+	// H3 of x + h3*x^3 for amplitude a is h3*a^2/4 re a.
+	a := dsp.FromDB(-12)
+	want := dsp.DB(0.01 * a * a / 4)
+	for _, p := range L.THDvsF {
+		if p.X >= 100 && p.X <= 5000 && math.Abs(p.THD-want) > 0.5 {
+			t.Errorf("THD at %.0f Hz: %.2f dB, want %.2f", p.X, p.THD, want)
+		}
+	}
+	// Cubic distortion re the fundamental falls 20 dB per 10 dB of level (H3 ~ a^2). One step
+	// only: further down the harmonic sinks under the noise.
+	if d := L.THDvsL[0].THD - L.THDvsL[1].THD; math.Abs(d-20) > 1 {
+		t.Errorf("THD drop over 10 dB of level: %.1f dB, want 20", d)
+	}
+	if math.IsNaN(L.IMDSMPTE) || L.IMDSMPTE > -40 || L.IMDSMPTE < -140 {
+		t.Errorf("SMPTE IMD %.1f dB", L.IMDSMPTE)
+	}
+	if math.IsNaN(L.IMDCCIF) || L.IMDCCIF > -40 {
+		t.Errorf("CCIF IMD %.1f dB", L.IMDCCIF)
+	}
+}
