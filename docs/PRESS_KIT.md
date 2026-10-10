@@ -5,7 +5,7 @@ review. Everything here is either in this repo or was measured with it, and wher
 unproven it says so.
 
 **Status: work in progress.** One person, one capture card, one device measured so far. Issues
-and pull requests are welcome once the repo is public (it is private for now).
+and pull requests are welcome.
 
 ---
 
@@ -21,7 +21,7 @@ and pull requests are welcome once the repo is public (it is private for now).
 |---|---|
 | https://github.com/sworrl/hione | The tool: Go backend, React + WebGL UI, report and chart export |
 
-GPL-3.0-or-later. Private for now.
+GPL-3.0-or-later. Public.
 
 ---
 
