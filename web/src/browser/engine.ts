@@ -316,9 +316,9 @@ export class BrowserEngine {
           if (syncAbs < 0 && m.conf >= MIN_CONFIDENCE && whole) {
             syncAbs = a + m.pos; syncConf = m.conf;
             rec.dropBefore(Math.round(syncAbs - (plan.syncLead + 0.3) * capRate));
-            this.log(`Test signal found (sync confidence ${isFinite(m.conf) ? m.conf.toFixed(0) : 'above 999'}).`);
+            this.log(`Test signal found (sync confidence ${conf(m.conf)}).`);
           } else if (syncAbs >= 0 && m.conf > 1.5 * syncConf && m.conf >= MIN_CONFIDENCE && a + m.pos > syncAbs + 0.05 * capRate && whole) {
-            this.log(`Clearer start marker found ${((a + m.pos - syncAbs) / capRate).toFixed(2)} s later (confidence ${isFinite(m.conf) ? m.conf.toFixed(0) : 'above 999'}), using it.`);
+            this.log(`Clearer start marker found ${((a + m.pos - syncAbs) / capRate).toFixed(2)} s later (confidence ${conf(m.conf)}), using it.`);
             syncAbs = a + m.pos; syncConf = m.conf;
           }
           if (syncAbs >= 0) need = Math.round(syncAbs + (plan.total - plan.syncLead + 3) * capRate * 1.001) - rec.offset;
@@ -407,4 +407,6 @@ function flatten(chunks: Float32Array[], len: number, from: number): Float64Arra
 
 const db = (v: number) => 20 * Math.log10(Math.max(v, 1e-15));
 function rmsOf(x: Float64Array) { let s = 0; for (let i = 0; i < x.length; i++) s += x[i] * x[i]; return Math.sqrt(s / Math.max(1, x.length)); }
-const fmt = (v: number | undefined) => (v === undefined || !isFinite(v) || v < -900 ? '-' : v.toFixed(1));
+const fmt = (v: number | undefined) => (v === undefined || !isFinite(v) || v < -900 ? '-' : (Math.abs(v) < 0.05 ? 0 : v).toFixed(1));
+/** Over digital silence the matched filter's confidence runs away; past 999 the number says nothing more. */
+const conf = (c: number) => (isFinite(c) && c < 1000 ? c.toFixed(0) : 'above 999');
