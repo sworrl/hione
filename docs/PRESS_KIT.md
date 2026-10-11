@@ -70,9 +70,10 @@ What you get out:
   capture host and the device's network address, since they get published
 * **A demo mode**: the UI plays a recorded M500 session and a finished run, so a visitor with
   no hardware can see what it does
-* **Pairing for a hosted UI**: the same frontend can live on a website and talk to Hione on the
-  visitor's own machine, after they pair it with a token. Origins are allowlisted and DNS
-  rebinding is blocked. Details in `docs/live-protocol.md`
+* **A hosted version that measures in the browser**: https://hione.falcontechnix.com records
+  from the visitor's own audio input and runs the same analysis in the page, checked against the
+  Go engine. Nothing is uploaded. It does not control the player: the visitor sets it and presses
+  play
 
 ## Who it's for
 
@@ -157,8 +158,9 @@ drops. Chart and report export in both themes. The live UI and demo mode in Chro
 **Implemented but not proven on hardware:** the full plan (stepped sines, SMPTE and CCIF IMD,
 L/R identification) has only run against the simulated device. Loopback and level calibration
 have not been run on a real card. The automatic volume step-down (the M500 run was already at
-a safe level, so it never stepped). Pairing from a real hosted page, since the UI is not hosted
-anywhere yet. Measuring a second device in manual mode.
+a safe level, so it never stepped). A browser measurement with a real player and audio
+interface: the hosted version has only been run against simulated captures so far. Measuring a
+second device in manual mode.
 
 **Not built yet:** music null tests (play a real track, subtract the source, listen to and
 measure what is left). Capture backends for macOS and Windows: the binary builds there, but

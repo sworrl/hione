@@ -35,6 +35,9 @@ visitors who have no hardware.
 
 ## Pairing a hosted frontend
 
+The hosted build at https://hione.falcontechnix.com does not pair: it measures in the browser
+(see the README). Pairing is still there for other frontends.
+
 The frontend in `web/` builds to static files. Served by `hione serve`, it needs nothing else.
 Hosted on a website, it talks to a Hione backend on the visitor's own machine:
 

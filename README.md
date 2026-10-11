@@ -137,10 +137,22 @@ with WebGL), the run controls and progress, the frequency response of every mode
 the impulse response, a results table, exports and the log. The older single-file page is at
 `/classic/`.
 
-The same frontend can be hosted on a website. Visitors without hardware get a demo that plays a
-recorded session. With hardware, they run `hione serve --allow-origin https://their.site` and
-pair with the token it prints. See `docs/live-protocol.md` for the stream format and the pairing
-rules.
+The same frontend runs hosted on a website, at https://hione.falcontechnix.com. Hosted, it
+measures in the browser: it records from the visitor's own audio input (browser voice processing
+off, at the input's own rate), and the same analysis as the Go engine runs in a Web Worker, so
+nothing is uploaded. There is no device control in the browser. The visitor downloads the level
+and test files the page renders, sets the player by hand and plays them, and the page waits for
+the start marker, as `--device manual` does. Each recording is a step in a session, so modes can
+be compared, and results save as JSON or CSV. Visitors without hardware get the demo. Served by
+`hione serve`, the page drives the backend as before.
+
+The TypeScript port is in `web/src/browser/` and was checked against `analysis.Analyze` on
+simulated captures (quick and full plans, 44.1 to 192 kHz, drift, inverted and swapped channels,
+restarts, clipping, missing markers): every field agrees to far below 0.01 dB.
+
+The backend still accepts paired requests from another origin (`--allow-origin` plus the token)
+for anyone building their own frontend. See `docs/live-protocol.md` for the stream format and the
+pairing rules.
 
 ## API
 

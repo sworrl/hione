@@ -5,6 +5,8 @@ import { LineChart, type Series } from './gl/LineChart';
 import { Meters } from './gl/Meters';
 import { Spectrogram } from './gl/Spectrogram';
 import { FILTER_LABEL, type ChartInfo, type LogEvent, type Progress, type Run, type State, type Step } from './types';
+import { BrowserEngine, TEST_LEVEL } from './browser/engine';
+import { BrowserExport, BrowserRunPanel, InputPanel } from './browser/panels';
 
 const fmt = (v: number | undefined | null, d = 1) => (v === undefined || v === null || !isFinite(v) || v < -900 ? '-' : v.toFixed(d));
 
@@ -22,6 +24,10 @@ export function App() {
   const [conn, setConn] = useState<Conn>(loadConn);
   const api = useMemo(() => new Api(conn), [conn]);
   const store = useMemo(() => new LiveStore(), []);
+  // Hosted on a website, the page measures in the browser with the visitor's own audio input.
+  // Served by the Hione binary, it drives that backend as before.
+  const browserMode = !isLocal();
+  const engine = useMemo(() => (browserMode ? new BrowserEngine() : null), [browserMode]);
   const [state, setState] = useState<State | null>(null);
   const [link, setLink] = useState<'connecting' | 'up' | 'down' | 'demo'>('connecting');
   const [linkErr, setLinkErr] = useState('');
@@ -29,7 +35,7 @@ export function App() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
-  const [showConn, setShowConn] = useState(!isLocal() && !conn.demo);
+  const [showConn, setShowConn] = useState(!isLocal());
   const [freqTick, setFreqTick] = useState(0);
   const addLog = useCallback((l: LogEvent) => setLogs(ls => [...ls.slice(-400), l]), []);
 
@@ -46,9 +52,41 @@ export function App() {
     return () => ac.abort();
   }, [conn.demo, store]);
 
+  // Browser mode: the engine's events and live frames stand in for the backend's WebSocket.
+  useEffect(() => {
+    if (!engine || conn.demo) return;
+    setLink(engine.capture.info ? 'up' : 'down');
+    setState(engine.state());
+    setLogs(engine.logs);
+    setRun(engine.runs[0] || null);
+    setRunId(engine.runs[0]?.id || null);
+    if (engine.meter) { store.freqs = engine.meter.freqs; store.rate = engine.meter.rate; setFreqTick(t => t + 1); }
+    const offF = engine.onFrame(f => store.push(f));
+    const offE = engine.on(m => {
+      if (m.type === 'log') setLogs(engine.logs);
+      if (m.type === 'progress') setProgress(m.progress);
+      if (m.type === 'step' || m.type === 'run') {
+        const id = m.type === 'step' ? m.step.run_id : m.run.id;
+        const r = engine.run(id);
+        setRunId(id);
+        setRun(r ? { ...r, steps: [...r.steps] } : null);
+      }
+      setState(engine.state());
+    });
+    return () => { offF(); offE(); };
+  }, [engine, conn.demo, store]);
+
+  const onInputOpened = useCallback(() => {
+    if (!engine?.meter) return;
+    store.freqs = engine.meter.freqs; store.rate = engine.meter.rate;
+    setFreqTick(t => t + 1);
+    setLink('up');
+    setState(engine.state());
+  }, [engine, store]);
+
   // Live link.
   useEffect(() => {
-    if (conn.demo) return;
+    if (conn.demo || engine) return;
     let ws: WebSocket | null = null;
     let closed = false;
     let retry = 0;
@@ -83,25 +121,28 @@ export function App() {
 
   const refreshState = useCallback(async () => {
     if (conn.demo) return;
+    if (engine) { setState(engine.state()); return; }
     try {
       const s = await api.state();
       setState(s);
-      setRunId(id => id || (s.runs[0]?.id ?? null));
+      // A fresh backend with no runs yet sends runs: null.
+      setRunId(id => id || (s.runs?.[0]?.id ?? null));
     } catch (e) { setLinkErr(String((e as Error).message)); }
   }, [api, conn.demo]);
 
   const refreshRun = useCallback(async (id: string) => {
     if (conn.demo) return;
+    if (engine) { const r = engine.run(id); setRun(r ? { ...r, steps: [...r.steps] } : null); return; }
     try { setRun(await api.run(id)); } catch { /* not there yet */ }
   }, [api, conn.demo]);
 
   useEffect(() => {
-    if (conn.demo) return;
+    if (conn.demo || engine) return;
     refreshState();
     api.state().then(s => setLogs(s.logs || [])).catch(() => {});
     const t = setInterval(refreshState, 4000);
     return () => clearInterval(t);
-  }, [refreshState, conn.demo, api]);
+  }, [refreshState, conn.demo, api, engine]);
   useEffect(() => { if (runId) refreshRun(runId); }, [runId, refreshRun]);
 
   const busy = !!state?.busy;
@@ -127,15 +168,18 @@ export function App() {
             <Chip label="volume" value={ds.volume || '-'} title={ds.sources?.volume} />
           </> : state && <Chip label="device" value={state.device} />}
           {state && <Chip label="test level" value={`${state.level_dbfs} dBFS`} />}
+          {engine && !state && !conn.demo && <Chip label="test level" value={`${TEST_LEVEL} dBFS`} />}
           {busy && <Chip label="" value="measuring" tone="warn" />}
         </div>
         <div className="actions">
-          <button className="ghost" onClick={() => setShowConn(s => !s)}>{conn.demo ? 'Demo' : isLocal() ? 'Pairing' : 'Connection'}</button>
+          <button className="ghost" onClick={() => setShowConn(s => !s)}>{conn.demo ? 'Demo' : isLocal() ? 'Pairing' : 'Input'}</button>
           <button className="ghost" onClick={toggleTheme}>{theme.name === 'dark' ? 'Light' : 'Dark'}</button>
         </div>
       </header>
 
-      {showConn && <ConnPanel conn={conn} api={api} onChange={c => { saveConn(c); setConn(c); }} />}
+      {showConn && (engine
+        ? <InputPanel engine={engine} demo={conn.demo} onDemo={d => { const c = { ...conn, demo: d }; saveConn(c); setConn(c); }} onOpened={onInputOpened} />
+        : <ConnPanel conn={conn} api={api} onChange={c => { saveConn(c); setConn(c); }} />)}
 
       <main className="grid">
         <section className="card span5">
@@ -144,7 +188,9 @@ export function App() {
           {run?.level && <p className={run.level.pass ? 'pass' : 'fail'}>{run.level.pass ? 'Level check passed. ' : 'Level check did not pass. '}<span className="muted">{run.level.message.replace(/^Level OK: /, '')}</span></p>}
         </section>
         <section className="card span7">
-          <RunPanel api={api} busy={busy} disabled={conn.demo || link !== 'up'} progress={progress} onStarted={id => { setRunId(id); refreshState(); }} />
+          {engine
+            ? <BrowserRunPanel engine={engine} busy={busy} disabled={conn.demo || link !== 'up'} progress={progress} />
+            : <RunPanel api={api} busy={busy} disabled={conn.demo || link !== 'up'} progress={progress} onStarted={id => { setRunId(id); refreshState(); }} />}
         </section>
 
         <section className="card span6">
@@ -162,13 +208,13 @@ export function App() {
           <ResultTable run={run} theme={theme} />
         </section>
         <section className="card span5">
-          <Export api={api} run={run} demo={conn.demo} />
+          {engine && !conn.demo ? <BrowserExport engine={engine} run={run} onOpened={r => { setRunId(r.id); setRun(r); }} /> : <Export api={api} run={run} demo={conn.demo} />}
           <h2 style={{ marginTop: 18 }}>Log</h2>
           <LogView logs={logs} />
         </section>
       </main>
       <footer className="foot">
-        <span>Hione {conn.demo ? '· demo session' : ''}</span>
+        <span>Hione {conn.demo ? '· demo session' : engine ? '· measuring in this browser, nothing leaves this computer' : ''}</span>
         <span className="muted">Every number goes through the capture card. Its own noise, distortion and filter are part of each result.</span>
       </footer>
     </div>
