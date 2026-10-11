@@ -150,6 +150,13 @@ The TypeScript port is in `web/src/browser/` and was checked against `analysis.A
 simulated captures (quick and full plans, 44.1 to 192 kHz, drift, inverted and swapped channels,
 restarts, clipping, missing markers): every field agrees to far below 0.01 dB.
 
+If the capture card is on another machine (the setup `--capture ssh://host/hw:0,0` covers for
+the app), `tools/remote-capture-bridge.sh host hw:0,0 192000` makes it an ordinary audio input on
+this one: it sets the remote mixer for line capture as the app does, runs arecord there over ssh
+into a PipeWire source called Remote-line-in, and restores the mixer on Ctrl-C. The browser then
+records from it like any other input. Browsers take the sound server's default rate (48 kHz on a
+stock PipeWire); the script's header says how to raise it.
+
 The backend still accepts paired requests from another origin (`--allow-origin` plus the token)
 for anyone building their own frontend. See `docs/live-protocol.md` for the stream format and the
 pairing rules.
