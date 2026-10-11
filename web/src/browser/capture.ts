@@ -56,7 +56,23 @@ export class Capture {
     if (deviceId) audio.deviceId = { exact: deviceId };
     // Chrome's legacy switches, honoured where the standard ones are not.
     Object.assign(audio, { googEchoCancellation: false, googNoiseSuppression: false, googAutoGainControl: false, googHighpassFilter: false });
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+    } catch (e) {
+      // A device id goes stale when the input is unplugged or the browser re-keys its ids; try
+      // the system's default input before giving up.
+      const name = (e as DOMException)?.name;
+      if (deviceId && (name === 'NotFoundError' || name === 'OverconstrainedError')) {
+        delete audio.deviceId;
+        try {
+          this.stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+        } catch (e2) {
+          throw new Error(explain(e2));
+        }
+      } else {
+        throw new Error(explain(e));
+      }
+    }
     const track = this.stream.getAudioTracks()[0];
     const s = track.getSettings();
     const rate = s.sampleRate || 48000;
@@ -100,4 +116,26 @@ export class Capture {
     this.ctx = null;
     this.info = null;
   }
+}
+
+/** The browser's own errors say little; say what to check. */
+export function explain(e: unknown): string {
+  const name = (e as DOMException)?.name || '';
+  const msg = (e as Error)?.message || String(e);
+  const os = navigator.userAgent;
+  const where = /Windows/.test(os)
+    ? 'In Windows, check Settings > Privacy & security > Microphone, and that the line input is enabled under Sound > Recording.'
+    : /Mac OS X|Macintosh/.test(os)
+      ? 'On a Mac, check System Settings > Privacy & Security > Microphone for this browser, and Audio MIDI Setup for the input.'
+      : 'On Linux, check that the input shows up in "pactl list short sources" (a .monitor source does not count), and that a Flatpak or Snap browser has been given audio input access.';
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    return `This browser can't see any audio input on this computer. Plug the cable into this computer's line input or USB audio interface, or open this page on the computer it is plugged into. ${where}`;
+  }
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return `The browser was not allowed to use the audio input. Allow it from the icon in the address bar and try again. ${where}`;
+  }
+  if (name === 'NotReadableError' || name === 'AbortError') {
+    return `The audio input is there but could not be opened. Another program may hold it, or the system blocked it. ${where}`;
+  }
+  return msg;
 }

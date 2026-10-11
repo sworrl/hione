@@ -22,8 +22,7 @@ export function InputPanel({ engine, demo, onDemo, onOpened }: { engine: Browser
       onDemo(false);
       onOpened();
     } catch (e) {
-      const m = (e as Error).message || String(e);
-      setErr(/denied|NotAllowed/i.test(m) ? 'The browser was not allowed to use the audio input. Allow it in the address bar and try again.' : m);
+      setErr((e as Error).message || String(e));
     } finally { setOpening(false); }
   };
   useEffect(() => { if (info) Capture.inputs().then(setInputs).catch(() => {}); }, [info]);
